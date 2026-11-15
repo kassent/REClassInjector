@@ -1,0 +1,27 @@
+schema_version = 1
+
+# 只编辑系统测试枚举，不涉及EnemyDef或任何敌人资源。
+[[enums]]
+name = "System.DayOfWeek"
+renames = [
+    {fromName = "Tuesday", to = "CI_Tuesday"},
+    {fromValue = 0, to = "CI_Sunday"},
+    {fromValue = 4, to = "CI_Thursday"}
+]
+appends = [
+    {name = "CI_ZeroAlias", value = 0},
+    {name = "CI_Negative", value = -1234567},
+    {name = "CI_Min", value = -2147483648},
+    {name = "CI_Max", value = 2147483647}
+]
+
+# 选择前一声明追加的成员；同一renames中混用按值/按名，0别名不改变canonical。
+[[enums]]
+name = "System.DayOfWeek"
+renames = [
+    {fromValue = -1234567, to = "CI_NegativeByValue"},
+    {fromValue = -2147483648, to = "CI_MinByValue"},
+    {fromValue = 2147483647, to = "CI_MaxByValue"},
+    {fromName = "CI_MinByValue", to = "CI_MinFinal"},
+    {fromValue = 0, to = "CI_Sunday"}
+]

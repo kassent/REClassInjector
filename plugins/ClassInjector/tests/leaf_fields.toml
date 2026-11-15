@@ -1,0 +1,22 @@
+# 临时实机配置：CIExampleProvider_ci.dll 复制并改名为 CILeafFields_ci.dll。
+# 引用赋值探针复用既有 ClassInjectorTests_ci + ProviderBootstrap，不进入生产清单。
+schema_version = 1
+
+[plugin]
+dll = "CILeafFields_ci.dll"
+
+[[types]]
+name = "app.cHunterWp03Handling"
+extend = true
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]
+
+[[types]]
+name = "ClassInjector.LeafTests.Wp03Derived"
+base = "app.cHunterWp03Handling"
+fields = [
+  { name = "OwnCounter", type = "System.Int32" },
+  { name = "OwnPeer", type = "System.Object" }
+]

@@ -1,6 +1,7 @@
 # ClassInjector 开发者指南
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [Public SDK header](include/ClassProvider.h)
+[Build from source / 从源码构建](BUILDING.md)
 
 **更早接入游戏初始化，让 Mod 拥有自己的组件、数据和原生行为。**
 

@@ -1,0 +1,62 @@
+schema_version = 1
+[plugin]
+dll = "ClassInjectorClosedTypes_ci.dll"
+
+# 全部签名已闭合。definition 只提供身份；不声明可动态实例化的 T 模板。
+[[types]]
+name = "ClassInjector.Tests.ThinkTimerReset`1<System.DayOfWeek>"
+generic_definition = "ClassInjector.Tests.ThinkTimerReset`1"
+generic_arguments = ["System.DayOfWeek"]
+base = "System.Object"
+abstract = true
+[[types.fields]]
+name = "_TimerType"
+type = "System.DayOfWeek"
+[[types.fields]]
+name = "_TimerUniqueId"
+type = "System.Int32"
+[[types.methods]]
+name = "get_TimerType"
+return_type = "System.DayOfWeek"
+binding = { function = "GetTimerType", version = 1 }
+[[types.methods]]
+name = "set_TimerType"
+parameters = [{ name = "value", type = "System.DayOfWeek" }]
+binding = { function = "SetTimerType", version = 1 }
+[[types.methods]]
+name = "start"
+kind = "virtual"
+parameters = [{ name = "arg", type = "via.behaviortree.ActionArg" }]
+binding = { function = "TimerStart", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.Em002ThinkTimerReset"
+base = "ClassInjector.Tests.ThinkTimerReset`1<System.DayOfWeek>"
+[[types.methods]]
+name = "start"
+kind = "override"
+parameters = [{ name = "arg", type = "via.behaviortree.ActionArg" }]
+binding = { function = "DerivedTimerStart", version = 1 }
+
+# 同一定义的引用实参实例：验证不同存储形状、共用定义及独立类型身份。
+[[types]]
+name = "ClassInjector.Tests.ThinkTimerReset`1<System.Object>"
+generic_definition = "ClassInjector.Tests.ThinkTimerReset`1"
+generic_arguments = ["System.Object"]
+base = "System.Object"
+abstract = true
+[[types.fields]]
+name = "_TimerType"
+type = "System.Object"
+[[types.fields]]
+name = "_TimerUniqueId"
+type = "System.Int32"
+[[types.methods]]
+name = "start"
+kind = "virtual"
+parameters = [{ name = "arg", type = "via.behaviortree.ActionArg" }]
+binding = { function = "ReferenceTimerStart", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.ReferenceTimerReset"
+base = "ClassInjector.Tests.ThinkTimerReset`1<System.Object>"

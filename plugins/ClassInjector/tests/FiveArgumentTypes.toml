@@ -1,0 +1,37 @@
+schema_version = 1
+
+[[types]]
+name = "ClassInjector.Tests.FiveArguments"
+base = "System.Object"
+fields = [
+    { name = "First", type = "System.Object" },
+    { name = "Second", type = "System.Int32" },
+    { name = "Third", type = "System.Object" },
+    { name = "Fourth", type = "System.Int32" },
+    { name = "Fifth", type = "System.UInt32" },
+    { name = "Calls", type = "System.Int32" },
+    { name = "ManagedEntry", type = "System.Int32" },
+    { name = "ManagedDepth", type = "System.Int32" },
+]
+
+[[types.methods]]
+name = "init"
+parameters = [
+    { name = "first", type = "System.Object" },
+    { name = "second", type = "System.Int32" },
+    { name = "third", type = "System.Object" },
+    { name = "fourth", type = "System.Int32" },
+    { name = "fifth", type = "System.UInt32" },
+]
+binding = { function = "Initialize", version = 1 }
+
+[[types.methods]]
+name = "initOriginal"
+parameters = [
+    { name = "first", type = "System.Object" },
+    { name = "second", type = "System.Int32" },
+    { name = "third", type = "System.Object" },
+    { name = "fourth", type = "System.Int32" },
+    { name = "fifth", type = "System.Boolean" },
+]
+binding = { function = "InitializeOriginal", version = 1 }

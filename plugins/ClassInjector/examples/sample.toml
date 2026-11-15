@@ -1,0 +1,50 @@
+schema_version = 1
+
+[plugin]
+dll = "CIExampleProvider_ci.dll"
+
+[[types]]
+name = "ClassInjector.Tests.CustomBase"
+base = "System.Object"
+
+[[types.fields]]
+name = "Counter"
+type = "System.Int32"
+
+[[types.methods]]
+name = ".ctor"
+kind = "constructor"
+binding = { function = "BaseCtor", version = 1 }
+
+[[types.methods]]
+name = "Add"
+kind = "instance"
+return_type = "System.Int32"
+parameters = [{ name = "value", type = "System.Int32" }]
+binding = { function = "Add", version = 1 }
+
+[[types.methods]]
+name = "Evaluate"
+kind = "virtual"
+return_type = "System.Int32"
+binding = { function = "BaseEvaluate", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.CustomDerived"
+base = "ClassInjector.Tests.CustomBase"
+
+[[types.fields]]
+name = "Bonus"
+type = "System.Int32"
+
+[[types.methods]]
+name = ".ctor"
+kind = "constructor"
+binding = { function = "DerivedCtor", version = 1 }
+
+[[types.methods]]
+name = "Evaluate"
+kind = "override"
+override_of = "ClassInjector.Tests.CustomBase"
+return_type = "System.Int32"
+binding = { function = "DerivedEvaluate", version = 1 }

@@ -1,0 +1,43 @@
+schema_version = 1
+
+[[types]]
+name = "ClassInjector.Tests.FloatingReturnBase"
+base = "System.Object"
+fields = [
+    { name = "SingleValue", type = "System.Single" },
+    { name = "DoubleValue", type = "System.Double" },
+]
+[[types.methods]]
+name = "get_Single"
+return_type = "System.Single"
+binding = { function = "GetSingle", version = 1 }
+[[types.methods]]
+name = "get_Double"
+return_type = "System.Double"
+binding = { function = "GetDouble", version = 1 }
+[[types.methods]]
+name = "get_VirtualSingle"
+kind = "virtual"
+return_type = "System.Single"
+binding = { function = "GetSingle", version = 1 }
+[[types.methods]]
+name = "get_VirtualDouble"
+kind = "virtual"
+return_type = "System.Double"
+binding = { function = "GetDouble", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.FloatingReturnDerived"
+base = "ClassInjector.Tests.FloatingReturnBase"
+[[types.methods]]
+name = "get_VirtualSingle"
+kind = "override"
+override_of = "ClassInjector.Tests.FloatingReturnBase"
+return_type = "System.Single"
+binding = { function = "GetNegativeSingle", version = 1 }
+[[types.methods]]
+name = "get_VirtualDouble"
+kind = "override"
+override_of = "ClassInjector.Tests.FloatingReturnBase"
+return_type = "System.Double"
+binding = { function = "GetNegativeDouble", version = 1 }

@@ -1,0 +1,239 @@
+schema_version = 1
+
+[plugin]
+dll = "ClassInjectorTests_ci.dll"
+
+[[types]]
+name = "ClassInjector.Tests.Arg"
+base = "ace.btable.cCommandArgument"
+fields = [
+  { name = "Value", type = "System.Int32" },
+  { name = "Text", type = "System.String" },
+  { name = "Flag", type = "ace.btable.cEditFieldBool" },
+  { name = "Mode", type = "ace.btable.cEditFieldEnum<app.EnemyDef.AREAMOVE_OBJECTIVE_TYPE_Fixed>" },
+  { name = "Peer", type = "ClassInjector.Tests.Arg" },
+  { name = "Payload", type = "System.Object" },
+  { name = "Items", type = "System.Int32[]" }
+]
+[[types.methods]]
+name = "Echo"
+return_type = "ClassInjector.Tests.Arg"
+parameters = [{ name = "argument", type = "ClassInjector.Tests.Arg" }]
+binding = { function = "WideEcho", version = 1 }
+[[types.methods]]
+name = "SetPeer"
+parameters = [{ name = "argument", type = "ClassInjector.Tests.Arg" }]
+binding = { function = "SetPeer", version = 1 }
+[[types.methods]]
+name = "SetText"
+parameters = [{ name = "text", type = "System.String" }]
+binding = { function = "SetText", version = 1 }
+[[types.methods]]
+name = "SetExtensionPeer"
+parameters = [{ name = "target", type = "System.Object" }, { name = "peer", type = "System.Object" }]
+binding = { function = "SetExtensionPeer", version = 1 }
+
+[[types.methods]]
+name = "TryGetId"
+return_type = "System.Boolean"
+parameters = [{ name = "fixedId", type = "System.Int32" }, { name = "id", type = "System.Int32", modifier = "out" }]
+binding = { function = "TryGetId", version = 1 }
+[[types.methods]]
+name = "TryGetScale"
+return_type = "System.Boolean"
+parameters = [{ name = "value", type = "System.Int32" }, { name = "scale", type = "System.Single", modifier = "out" }]
+binding = { function = "TryGetScale", version = 1 }
+[[types.methods]]
+name = "TryGetPeer"
+return_type = "System.Boolean"
+parameters = [{ name = "value", type = "System.Int32" }, { name = "peer", type = "ClassInjector.Tests.Arg", modifier = "out" }]
+binding = { function = "TryGetPeer", version = 1 }
+[[types.methods]]
+name = "TryGetPair"
+return_type = "System.Boolean"
+parameters = [{ name = "first", type = "System.Int32", modifier = "out" }, { name = "second", type = "System.Int32", modifier = "out" }]
+binding = { function = "TryGetPair", version = 1 }
+[[types.methods]]
+name = "TryGetNumber"
+kind = "virtual"
+return_type = "System.Boolean"
+parameters = [{ name = "number", type = "System.Int32", modifier = "out" }]
+binding = { function = "TryGetNumber", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.DerivedArg"
+base = "ClassInjector.Tests.Arg"
+fields = [{ name = "Extra", type = "System.Int32" }]
+[[types.methods]]
+name = "TryGetNumber"
+kind = "override"
+return_type = "System.Boolean"
+parameters = [{ name = "number", type = "System.Int32", modifier = "out" }]
+binding = { function = "TryGetDerivedNumber", version = 1 }
+
+[[types]]
+name = "ace.btable.cCommandAction`1<ClassInjector.Tests.Arg>"
+generic_template = "ace.btable.cCommandAction`1<app.btable.EmCommonCommand.cCheckLifeActArg>"
+generic_arguments = ["ClassInjector.Tests.Arg"]
+abstract = true
+[[types.methods]]
+name = "execute"
+kind = "override"
+return_type = "ace.btable.COMMAND_RESULT"
+parameters = [
+  { name = "work", type = "ace.btable.cCommandWork" },
+  { name = "argument", type = "ace.btable.cCommandArgument" }
+]
+binding = { function = "AggregateProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.Cmd"
+base = "ace.btable.cCommandAction`1<ClassInjector.Tests.Arg>"
+fields = [
+  { name = "Counter", type = "System.Int32" },
+  { name = "LastArg", type = "ClassInjector.Tests.Arg" }
+]
+[[types.methods]]
+name = "onExecute"
+kind = "override"
+override_of = "ace.btable.cCommandAction`1<ClassInjector.Tests.Arg>"
+parameters = [
+  { name = "work", type = "ace.btable.cCommandWork" },
+  { name = "argument", type = "ClassInjector.Tests.Arg" }
+]
+binding = { function = "OnExecuteProbe", version = 1 }
+
+# 仅用于原生组件创建/调度验证，不依赖 Lua 每帧转调，也不手动设置 callback mask。
+# AppBehavior 的 awake/start/onDestroy 为 final，通过 doXXX 重写；更新方法直接 override。
+[[types]]
+name = "ClassInjector.Tests.PlayerBehavior"
+base = "app.AppBehavior"
+fields = [
+  { name = "AwakeCount", type = "System.Int32" },
+  { name = "StartCount", type = "System.Int32" },
+  { name = "UpdateCount", type = "System.Int32" },
+  { name = "LateUpdateCount", type = "System.Int32" },
+  { name = "DestroyCount", type = "System.Int32" },
+  { name = "ResourceValue", type = "System.Int32", serialize = true },
+  { name = "AwakeValue", type = "System.Int32" }
+]
+[[types.methods]]
+name = "doAwake"
+kind = "override"
+binding = { function = "BehaviorAwake", version = 1 }
+[[types.methods]]
+name = "doStart"
+kind = "override"
+binding = { function = "BehaviorStart", version = 1 }
+[[types.methods]]
+name = "update"
+kind = "override"
+binding = { function = "BehaviorUpdate", version = 1 }
+[[types.methods]]
+name = "lateUpdate"
+kind = "override"
+binding = { function = "BehaviorLateUpdate", version = 1 }
+[[types.methods]]
+name = "doOnDestroy"
+kind = "override"
+binding = { function = "BehaviorOnDestroy", version = 1 }
+
+# 值类型字段布局/SDK/native SIMD/原 AOT 往返验证，不自动部署。
+[[types]]
+name = "ClassInjector.Tests.ValueFields"
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPosition", type = "via.vec3" },
+  { name = "CIMiddle", type = "System.Int32" },
+  { name = "CIOffset", type = "via.vec3" },
+  { name = "CIGuid", type = "System.Guid" },
+  { name = "CITail", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]
+[[types.methods]]
+name = "FillTarget"
+return_type = "System.Int32"
+parameters = [{ name = "target", type = "System.Object" }, { name = "seed", type = "System.Int32" }]
+binding = { function = "FillValueFields", version = 1 }
+
+[[types]]
+name = "System.Runtime.CompilerServices.RuntimeCompatibilityAttribute"
+extend = true
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPosition", type = "via.vec3" },
+  { name = "CIMiddle", type = "System.Int32" },
+  { name = "CIOffset", type = "via.vec3" },
+  { name = "CIGuid", type = "System.Guid" },
+  { name = "CITail", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]
+
+[[types]]
+name = "ZXing.Common.BitSource"
+extend = true
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPosition", type = "via.vec3" },
+  { name = "CIMiddle", type = "System.Int32" },
+  { name = "CIOffset", type = "via.vec3" },
+  { name = "CIGuid", type = "System.Guid" },
+  { name = "CITail", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]
+
+# RSZ 只序列化明确标记的字段；RuntimeOnly 保持运行时数据。
+[[types]]
+name = "ClassInjector.Tests.RszPlain"
+fields = [
+  { name = "Value", type = "System.Int32", serialize = true },
+  { name = "RuntimeOnly", type = "System.Int32" }
+]
+
+[[types]]
+name = "ClassInjector.Tests.RszNode"
+base = "ClassInjector.Tests.RszPlain"
+fields = [
+  { name = "Peer", type = "ClassInjector.Tests.RszNode", serialize = true },
+  { name = "Text", type = "System.String", serialize = true },
+  { name = "Numbers", type = "System.Int32[]", serialize = true }
+]
+
+[[types]]
+name = "ClassInjector.Tests.RszValues"
+fields = [
+    { name = "Position", type = "via.vec3", serialize = true },
+    { name = "Guid", type = "System.Guid", serialize = true }
+]
+
+[[types]]
+name = "ClassInjector.Tests.RszUser"
+base = "via.UserData"
+fields = [{ name = "Value", type = "System.Int32", serialize = true }]
+
+# 只作显式 ABI/虚分派测试，不挂到怪物或修改实际 BTable。
+[[types]]
+name = "ClassInjector.Tests.RefExport"
+base = "ace.btable.cExportBTableBase"
+[[types.methods]]
+name = "updateTableInpl"
+kind = "override"
+parameters = [
+    { name = "position", type = "ace.btable.BTableDef.POSITION", modifier = "ref" },
+    { name = "work", type = "ace.btable.cCommandWork" },
+    { name = "opWork", type = "ace.btable.cOperatorWork" }
+]
+binding = { function = "UpdateTableInplProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.RefExportDerived"
+base = "ClassInjector.Tests.RefExport"
+[[types.methods]]
+name = "updateTableInpl"
+kind = "override"
+parameters = [
+    { name = "position", type = "ace.btable.BTableDef.POSITION", modifier = "ref" },
+    { name = "work", type = "ace.btable.cCommandWork" },
+    { name = "opWork", type = "ace.btable.cOperatorWork" }
+]
+binding = { function = "DerivedUpdateTableInplProbe", version = 1 }

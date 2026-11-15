@@ -1,0 +1,429 @@
+schema_version = 1
+
+[[types]]
+name = "ClassInjector.Tests.Signatures"
+base = "System.Object"
+
+[[types.methods]]
+name = "Void"
+return_type = "System.Void"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Void", version = 1 }
+
+[[types.methods]]
+name = "Boolean"
+return_type = "System.Boolean"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Boolean", version = 1 }
+
+[[types.methods]]
+name = "SByte"
+return_type = "System.SByte"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "SByte", version = 1 }
+
+[[types.methods]]
+name = "Byte"
+return_type = "System.Byte"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Byte", version = 1 }
+
+[[types.methods]]
+name = "Int16"
+return_type = "System.Int16"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Int16", version = 1 }
+
+[[types.methods]]
+name = "UInt16"
+return_type = "System.UInt16"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "UInt16", version = 1 }
+
+[[types.methods]]
+name = "Char"
+return_type = "System.Char"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Char", version = 1 }
+
+[[types.methods]]
+name = "Int32"
+return_type = "System.Int32"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Int32", version = 1 }
+
+[[types.methods]]
+name = "UInt32"
+return_type = "System.UInt32"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "UInt32", version = 1 }
+
+[[types.methods]]
+name = "Int64"
+return_type = "System.Int64"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Int64", version = 1 }
+
+[[types.methods]]
+name = "UInt64"
+return_type = "System.UInt64"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "UInt64", version = 1 }
+
+[[types.methods]]
+name = "Single"
+return_type = "System.Single"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Single", version = 1 }
+
+[[types.methods]]
+name = "Double"
+return_type = "System.Double"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Double", version = 1 }
+
+[[types.methods]]
+name = "Object"
+return_type = "System.Object"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Object", version = 1 }
+
+[[types.methods]]
+name = "Category"
+return_type = "via.motion.SequenceCategory"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Category", version = 1 }
+
+[[types.methods]]
+name = "String"
+return_type = "System.String"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "String", version = 1 }
+
+[[types.methods]]
+name = "Array"
+return_type = "System.Object[]"
+parameters = [
+    { name = "p0", type = "System.Single" },
+    { name = "p1", type = "System.Double" },
+    { name = "p2", type = "System.Int32" },
+    { name = "p3", type = "System.UInt32" },
+    { name = "p4", type = "System.Object" },
+    { name = "p5", type = "System.Boolean" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Double" },
+    { name = "p8", type = "System.Int64" },
+    { name = "p9", type = "System.UInt64" },
+    { name = "p10", type = "System.SByte" },
+    { name = "p11", type = "System.Byte" },
+    { name = "p12", type = "System.Int16" },
+    { name = "p13", type = "System.UInt16" },
+    { name = "p14", type = "System.Char" },
+    { name = "p15", type = "via.motion.SequenceCategory" },
+]
+binding = { function = "Array", version = 1 }
+
+[[types.methods]]
+name = "Reverse"
+return_type = "System.Double"
+parameters = [
+    { name = "p0", type = "System.Int32" },
+    { name = "p1", type = "System.Single" },
+    { name = "p2", type = "System.Object" },
+    { name = "p3", type = "System.Double" },
+    { name = "p4", type = "System.Boolean" },
+    { name = "p5", type = "System.UInt32" },
+    { name = "p6", type = "System.Single" },
+    { name = "p7", type = "System.Object" },
+    { name = "p8", type = "System.Double" },
+]
+binding = { function = "Reverse", version = 1 }
+
+[[types.methods]]
+name = "Zero"
+return_type = "System.UInt64"
+parameters = [
+
+]
+binding = { function = "Zero", version = 1 }
+
+[[types.methods]]
+name = "One"
+return_type = "System.Int32"
+parameters = [
+    { name = "p0", type = "System.Int32" },
+]
+binding = { function = "One", version = 1 }
+

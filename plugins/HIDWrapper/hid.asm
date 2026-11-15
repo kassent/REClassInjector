@@ -1,0 +1,236 @@
+.code
+extern OriginalHidD_FlushQueue: QWORD
+ForwardHidD_FlushQueue PROC
+	jmp  OriginalHidD_FlushQueue
+ForwardHidD_FlushQueue ENDP
+
+extern OriginalHidD_FreePreparsedData: QWORD
+ForwardHidD_FreePreparsedData PROC
+	jmp  OriginalHidD_FreePreparsedData
+ForwardHidD_FreePreparsedData ENDP
+
+extern OriginalHidD_GetAttributes: QWORD
+ForwardHidD_GetAttributes PROC
+	jmp  OriginalHidD_GetAttributes
+ForwardHidD_GetAttributes ENDP
+
+extern OriginalHidD_GetConfiguration: QWORD
+ForwardHidD_GetConfiguration PROC
+	jmp  OriginalHidD_GetConfiguration
+ForwardHidD_GetConfiguration ENDP
+
+extern OriginalHidD_GetFeature: QWORD
+ForwardHidD_GetFeature PROC
+	jmp  OriginalHidD_GetFeature
+ForwardHidD_GetFeature ENDP
+
+extern OriginalHidD_GetHidGuid: QWORD
+ForwardHidD_GetHidGuid PROC
+	jmp  OriginalHidD_GetHidGuid
+ForwardHidD_GetHidGuid ENDP
+
+extern OriginalHidD_GetIndexedString: QWORD
+ForwardHidD_GetIndexedString PROC
+	jmp  OriginalHidD_GetIndexedString
+ForwardHidD_GetIndexedString ENDP
+
+extern OriginalHidD_GetInputReport: QWORD
+ForwardHidD_GetInputReport PROC
+	jmp  OriginalHidD_GetInputReport
+ForwardHidD_GetInputReport ENDP
+
+extern OriginalHidD_GetManufacturerString: QWORD
+ForwardHidD_GetManufacturerString PROC
+	jmp  OriginalHidD_GetManufacturerString
+ForwardHidD_GetManufacturerString ENDP
+
+extern OriginalHidD_GetMsGenreDescriptor: QWORD
+ForwardHidD_GetMsGenreDescriptor PROC
+	jmp  OriginalHidD_GetMsGenreDescriptor
+ForwardHidD_GetMsGenreDescriptor ENDP
+
+extern OriginalHidD_GetNumInputBuffers: QWORD
+ForwardHidD_GetNumInputBuffers PROC
+	jmp  OriginalHidD_GetNumInputBuffers
+ForwardHidD_GetNumInputBuffers ENDP
+
+extern OriginalHidD_GetPhysicalDescriptor: QWORD
+ForwardHidD_GetPhysicalDescriptor PROC
+	jmp  OriginalHidD_GetPhysicalDescriptor
+ForwardHidD_GetPhysicalDescriptor ENDP
+
+extern OriginalHidD_GetPreparsedData: QWORD
+ForwardHidD_GetPreparsedData PROC
+	jmp  OriginalHidD_GetPreparsedData
+ForwardHidD_GetPreparsedData ENDP
+
+extern OriginalHidD_GetProductString: QWORD
+ForwardHidD_GetProductString PROC
+	jmp  OriginalHidD_GetProductString
+ForwardHidD_GetProductString ENDP
+
+extern OriginalHidD_GetSerialNumberString: QWORD
+ForwardHidD_GetSerialNumberString PROC
+	jmp  OriginalHidD_GetSerialNumberString
+ForwardHidD_GetSerialNumberString ENDP
+
+extern OriginalHidD_Hello: QWORD
+ForwardHidD_Hello PROC
+	jmp  OriginalHidD_Hello
+ForwardHidD_Hello ENDP
+
+extern OriginalHidD_SetConfiguration: QWORD
+ForwardHidD_SetConfiguration PROC
+	jmp  OriginalHidD_SetConfiguration
+ForwardHidD_SetConfiguration ENDP
+
+extern OriginalHidD_SetFeature: QWORD
+ForwardHidD_SetFeature PROC
+	jmp  OriginalHidD_SetFeature
+ForwardHidD_SetFeature ENDP
+
+extern OriginalHidD_SetNumInputBuffers: QWORD
+ForwardHidD_SetNumInputBuffers PROC
+	jmp  OriginalHidD_SetNumInputBuffers
+ForwardHidD_SetNumInputBuffers ENDP
+
+extern OriginalHidD_SetOutputReport: QWORD
+ForwardHidD_SetOutputReport PROC
+	jmp  OriginalHidD_SetOutputReport
+ForwardHidD_SetOutputReport ENDP
+
+extern OriginalHidP_GetButtonArray: QWORD
+ForwardHidP_GetButtonArray PROC
+	jmp  OriginalHidP_GetButtonArray
+ForwardHidP_GetButtonArray ENDP
+
+extern OriginalHidP_GetButtonCaps: QWORD
+ForwardHidP_GetButtonCaps PROC
+	jmp  OriginalHidP_GetButtonCaps
+ForwardHidP_GetButtonCaps ENDP
+
+extern OriginalHidP_GetCaps: QWORD
+ForwardHidP_GetCaps PROC
+	jmp  OriginalHidP_GetCaps
+ForwardHidP_GetCaps ENDP
+
+extern OriginalHidP_GetData: QWORD
+ForwardHidP_GetData PROC
+	jmp  OriginalHidP_GetData
+ForwardHidP_GetData ENDP
+
+extern OriginalHidP_GetExtendedAttributes: QWORD
+ForwardHidP_GetExtendedAttributes PROC
+	jmp  OriginalHidP_GetExtendedAttributes
+ForwardHidP_GetExtendedAttributes ENDP
+
+extern OriginalHidP_GetLinkCollectionNodes: QWORD
+ForwardHidP_GetLinkCollectionNodes PROC
+	jmp  OriginalHidP_GetLinkCollectionNodes
+ForwardHidP_GetLinkCollectionNodes ENDP
+
+extern OriginalHidP_GetScaledUsageValue: QWORD
+ForwardHidP_GetScaledUsageValue PROC
+	jmp  OriginalHidP_GetScaledUsageValue
+ForwardHidP_GetScaledUsageValue ENDP
+
+extern OriginalHidP_GetSpecificButtonCaps: QWORD
+ForwardHidP_GetSpecificButtonCaps PROC
+	jmp  OriginalHidP_GetSpecificButtonCaps
+ForwardHidP_GetSpecificButtonCaps ENDP
+
+extern OriginalHidP_GetSpecificValueCaps: QWORD
+ForwardHidP_GetSpecificValueCaps PROC
+	jmp  OriginalHidP_GetSpecificValueCaps
+ForwardHidP_GetSpecificValueCaps ENDP
+
+extern OriginalHidP_GetUsageValue: QWORD
+ForwardHidP_GetUsageValue PROC
+	jmp  OriginalHidP_GetUsageValue
+ForwardHidP_GetUsageValue ENDP
+
+extern OriginalHidP_GetUsageValueArray: QWORD
+ForwardHidP_GetUsageValueArray PROC
+	jmp  OriginalHidP_GetUsageValueArray
+ForwardHidP_GetUsageValueArray ENDP
+
+extern OriginalHidP_GetUsages: QWORD
+ForwardHidP_GetUsages PROC
+	jmp  OriginalHidP_GetUsages
+ForwardHidP_GetUsages ENDP
+
+extern OriginalHidP_GetUsagesEx: QWORD
+ForwardHidP_GetUsagesEx PROC
+	jmp  OriginalHidP_GetUsagesEx
+ForwardHidP_GetUsagesEx ENDP
+
+extern OriginalHidP_GetValueCaps: QWORD
+ForwardHidP_GetValueCaps PROC
+	jmp  OriginalHidP_GetValueCaps
+ForwardHidP_GetValueCaps ENDP
+
+extern OriginalHidP_GetVersionInternal: QWORD
+ForwardHidP_GetVersionInternal PROC
+	jmp  OriginalHidP_GetVersionInternal
+ForwardHidP_GetVersionInternal ENDP
+
+extern OriginalHidP_InitializeReportForID: QWORD
+ForwardHidP_InitializeReportForID PROC
+	jmp  OriginalHidP_InitializeReportForID
+ForwardHidP_InitializeReportForID ENDP
+
+extern OriginalHidP_MaxDataListLength: QWORD
+ForwardHidP_MaxDataListLength PROC
+	jmp  OriginalHidP_MaxDataListLength
+ForwardHidP_MaxDataListLength ENDP
+
+extern OriginalHidP_MaxUsageListLength: QWORD
+ForwardHidP_MaxUsageListLength PROC
+	jmp  OriginalHidP_MaxUsageListLength
+ForwardHidP_MaxUsageListLength ENDP
+
+extern OriginalHidP_SetButtonArray: QWORD
+ForwardHidP_SetButtonArray PROC
+	jmp  OriginalHidP_SetButtonArray
+ForwardHidP_SetButtonArray ENDP
+
+extern OriginalHidP_SetData: QWORD
+ForwardHidP_SetData PROC
+	jmp  OriginalHidP_SetData
+ForwardHidP_SetData ENDP
+
+extern OriginalHidP_SetScaledUsageValue: QWORD
+ForwardHidP_SetScaledUsageValue PROC
+	jmp  OriginalHidP_SetScaledUsageValue
+ForwardHidP_SetScaledUsageValue ENDP
+
+extern OriginalHidP_SetUsageValue: QWORD
+ForwardHidP_SetUsageValue PROC
+	jmp  OriginalHidP_SetUsageValue
+ForwardHidP_SetUsageValue ENDP
+
+extern OriginalHidP_SetUsageValueArray: QWORD
+ForwardHidP_SetUsageValueArray PROC
+	jmp  OriginalHidP_SetUsageValueArray
+ForwardHidP_SetUsageValueArray ENDP
+
+extern OriginalHidP_SetUsages: QWORD
+ForwardHidP_SetUsages PROC
+	jmp  OriginalHidP_SetUsages
+ForwardHidP_SetUsages ENDP
+
+extern OriginalHidP_TranslateUsagesToI8042ScanCodes: QWORD
+ForwardHidP_TranslateUsagesToI8042ScanCodes PROC
+	jmp  OriginalHidP_TranslateUsagesToI8042ScanCodes
+ForwardHidP_TranslateUsagesToI8042ScanCodes ENDP
+
+extern OriginalHidP_UnsetUsages: QWORD
+ForwardHidP_UnsetUsages PROC
+	jmp  OriginalHidP_UnsetUsages
+ForwardHidP_UnsetUsages ENDP
+
+extern OriginalHidP_UsageListDifference: QWORD
+ForwardHidP_UsageListDifference PROC
+	jmp  OriginalHidP_UsageListDifference
+ForwardHidP_UsageListDifference ENDP
+end

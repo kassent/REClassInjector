@@ -1,0 +1,130 @@
+schema_version = 1
+
+[plugin]
+dll = "InterfaceTests_ci.dll"
+
+[[types]]
+name = "ClassInjector.Tests.InterfaceProbe"
+interfaces = ["System.IDisposable", "System.ICloneable", "System.IComparable", "System.Collections.IEnumerator", "System.Collections.IEnumerable"]
+fields = [
+  { name = "Counter", type = "System.Int32" },
+  { name = "Cursor", type = "System.Int32" },
+  { name = "Current", type = "System.Object" }
+]
+[[types.methods]]
+name = "Dispose"
+kind = "virtual"
+binding = { function = "DisposeProbe", version = 1 }
+[[types.methods]]
+name = "Clone"
+return_type = "System.Object"
+binding = { function = "CurrentProbe", version = 1 }
+[[types.methods]]
+name = "MoveNext"
+return_type = "System.Boolean"
+binding = { function = "MoveNextProbe", version = 1 }
+[[types.methods]]
+name = "get_Current"
+return_type = "System.Object"
+binding = { function = "CurrentProbe", version = 1 }
+[[types.methods]]
+name = "Reset"
+binding = { function = "ResetProbe", version = 1 }
+[[types.methods]]
+name = "GetEnumerator"
+return_type = "System.Collections.IEnumerator"
+binding = { function = "EnumeratorProbe", version = 1 }
+[[types.methods]]
+name = "CompareTo"
+return_type = "System.Int32"
+parameters = [{ name = "other", type = "System.Object" }]
+binding = { function = "CompareProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.DerivedInterfaceProbe"
+base = "ClassInjector.Tests.InterfaceProbe"
+[[types.methods]]
+name = "Dispose"
+kind = "override"
+binding = { function = "DisposeDerivedProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.ReimplementedInterfaceProbe"
+base = "ClassInjector.Tests.InterfaceProbe"
+interfaces = ["System.ICloneable"]
+[[types.methods]]
+name = "Clone"
+return_type = "System.Object"
+binding = { function = "SelfProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.InterfaceHolder"
+fields = [
+  { name = "Disposable", type = "System.IDisposable" },
+  { name = "Enumerator", type = "System.Collections.IEnumerator" },
+  { name = "Enumerable", type = "System.Collections.IEnumerable" }
+]
+
+[[types]]
+name = "ClassInjector.Tests.AbstractDisposable"
+abstract = true
+interfaces = ["System.IDisposable"]
+[[types.methods]]
+name = "Dispose"
+kind = "abstract"
+
+[[types]]
+name = "ClassInjector.Tests.ConcreteDisposable"
+base = "ClassInjector.Tests.AbstractDisposable"
+fields = [{ name = "Counter", type = "System.Int32" }]
+[[types.methods]]
+name = "Dispose"
+kind = "override"
+binding = { function = "DisposeProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.GenericInterfaceProbe"
+interfaces = [
+  "System.Collections.Generic.IEnumerator`1<app.GUI040208.AnimalReportInfo>",
+  "System.Collections.Generic.IEnumerable`1<app.GUI040208.AnimalReportInfo>"
+]
+fields = [
+  { name = "Counter", type = "System.Int32" },
+  { name = "Cursor", type = "System.Int32" },
+  { name = "Current", type = "app.GUI040208.AnimalReportInfo" }
+]
+[[types.methods]]
+name = "Dispose"
+binding = { function = "DisposeProbe", version = 1 }
+[[types.methods]]
+name = "MoveNext"
+return_type = "System.Boolean"
+binding = { function = "MoveNextProbe", version = 1 }
+[[types.methods]]
+name = "Reset"
+binding = { function = "ResetProbe", version = 1 }
+[[types.methods]]
+name = "System.Collections.IEnumerator.get_Current"
+return_type = "System.Object"
+binding = { function = "CurrentProbe", version = 1 }
+[[types.methods]]
+name = "System.Collections.Generic.IEnumerator`1<app.GUI040208.AnimalReportInfo>.get_Current"
+return_type = "app.GUI040208.AnimalReportInfo"
+binding = { function = "CurrentProbe", version = 1 }
+[[types.methods]]
+name = "System.Collections.IEnumerable.GetEnumerator"
+return_type = "System.Collections.IEnumerator"
+binding = { function = "EnumeratorProbe", version = 1 }
+[[types.methods]]
+name = "System.Collections.Generic.IEnumerable`1<app.GUI040208.AnimalReportInfo>.GetEnumerator"
+return_type = "System.Collections.Generic.IEnumerator`1<app.GUI040208.AnimalReportInfo>"
+binding = { function = "EnumeratorProbe", version = 1 }
+
+[[types]]
+name = "ClassInjector.Tests.ExistingInterfaceBaseProbe"
+base = "System.Collections.Generic.List`1<app.GUI040208.AnimalReportInfo>"
+interfaces = ["System.ICloneable", "System.Collections.Generic.ICollection`1<app.GUI040208.AnimalReportInfo>"]
+[[types.methods]]
+name = "Clone"
+return_type = "System.Object"
+binding = { function = "SelfProbe", version = 1 }

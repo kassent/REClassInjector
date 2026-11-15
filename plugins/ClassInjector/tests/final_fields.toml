@@ -1,0 +1,21 @@
+# 离线测试配置；实机声明合并在 ClassInjectorTests_ci.toml，不与其同时部署（一 DLL 一 TOML）。
+schema_version = 1
+
+[plugin]
+dll = "ClassInjectorTests_ci.dll"
+
+[[types]]
+name = "System.Runtime.CompilerServices.RuntimeCompatibilityAttribute"
+extend = true
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]
+
+[[types]]
+name = "ZXing.Common.BitSource"
+extend = true
+fields = [
+  { name = "CICounter", type = "System.Int32" },
+  { name = "CIPeer", type = "System.Object" }
+]

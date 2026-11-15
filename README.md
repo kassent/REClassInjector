@@ -1,6 +1,7 @@
 # ClassInjector Developer Guide
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [Public SDK header](include/ClassProvider.h)
+[Build from source / 从源码构建](BUILDING.md)
 
 **Integrate earlier in game initialization, and give your mod its own components, data, and native behavior.**
 
