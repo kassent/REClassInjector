@@ -459,7 +459,7 @@ def main():
             stream.seek(pe_offset + 8)
             pe_timestamp = S.unpack('<I', stream.read(4))[0]
         source_names = (
-            'include/ClassProvider.h', 'include/ClassInjector.h',
+            'include/ci/Provider.h', 'include/ci/Provider.hpp', 'include/ClassInjector.h',
             'src/TypeDatabaseRecords.h', 'src/CustomTypeConfig.h', 'src/CustomTypeBuildSpec.h',
             'src/TypeDatabase.h', 'src/TypeDatabase.cpp',
             'src/TypeDatabaseBuilder.h', 'src/TypeDatabaseBuilder.cpp',

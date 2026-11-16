@@ -193,6 +193,17 @@ namespace ci {
         return nullptr;
     }
 
+    const char* TypeDatabase::GetFullNameData(uint32_t index) const {
+        {
+            std::shared_lock lock(nameQueryMutex);
+            if (auto found = fullNameQueries.find(index); found != fullNameQueries.end())
+                return found->second.c_str();
+        }
+        auto name = GetFullName(index);
+        std::unique_lock lock(nameQueryMutex);
+        return fullNameQueries.try_emplace(index, std::move(name)).first->second.c_str();
+    }
+
     const Type* TypeDatabase::GetType(std::string_view name) const {
         auto found = typeNames.find(std::string(name));
         // typeNames 还含供 TOML 使用的泛型别名；公共查询只接受 RF 风格的完整名称。
@@ -261,23 +272,6 @@ namespace ci {
         return method;
     }
 
-    const FieldLayout* TypeDatabase::GetFieldLayout(const Type* type, std::string_view name) const {
-        if (!type)
-            return nullptr;
-        auto key = std::string(name);
-        {
-            std::shared_lock lock(fieldQueryMutex);
-            if (const auto typeFields = fieldQueries.find(type); typeFields != fieldQueries.end())
-                if (const auto field = typeFields->second.find(key); field != typeFields->second.end())
-                    return &field->second;
-        }
-        FieldLayout layout{};
-        if (!TryGetFieldLayout(type, name, layout))
-            return nullptr;
-        std::unique_lock lock(fieldQueryMutex);
-        return &fieldQueries[type].try_emplace(std::move(key), layout).first->second;
-    }
-
     // Only reads field tables; valid before runtime ObjectInfo exists, including inherited declarations.
     const FieldDef* TypeDatabase::GetFieldDef(const Type* type, std::string_view name) const {
         for (auto* current = type; current;
@@ -293,19 +287,38 @@ namespace ci {
         return nullptr;
     }
 
-    bool TypeDatabase::TryGetFieldLayout(const Type* type, std::string_view name, FieldLayout& result) const {
-        const auto* field = GetFieldDef(type, name);
-        if (!field) return false;
-        const auto& layout = fieldImpls[field->impl];
-        const auto& fieldType = types[field->type];
-        // abstract 父类可能没有 ObjectInfo；基址属于请求的具体类型，而非字段声明类型。
-        const auto base = type->objectInfo ? *reinterpret_cast<const int32_t*>(type->objectInfo - 1) : 0;
-        result = {.type = &fieldType,
-                  .valueOffset = layout.offset,
-                  .objectOffset = uint32_t(base + layout.offset),
-                  .valueSize = fieldType.objectType == std::to_underlying(via::clr::VMObjType::ValType)
-                                   ? uint32_t(typeImpls[fieldType.implIndex].fieldSize) : 0};
-        return true;
+    const FieldDef* TypeDatabase::FindFieldDeclaration(const Type* type, std::string_view name) const {
+        for (auto* current = type; current;
+             current = current->parentTypeIndex ? &types[current->parentTypeIndex] : nullptr) {
+            const auto& impl = typeImpls[current->implIndex];
+            for (uint32_t i = 0; i < impl.numMemberFields; ++i) {
+                const auto& field = fields[current->memberFieldIndex + i];
+                if (name == strings.data() + fieldImpls[field.impl].name)
+                    return &field;
+            }
+        }
+        return nullptr;
+    }
+
+    const void* TypeDatabase::GetFieldInitializer(const FieldDef& field) const {
+        const auto& impl = fieldImpls[field.impl];
+        // Raw initializer data also includes nonliteral RVA fields. Literal policy belongs to callers.
+        // Reference initializers are encoded pool data, not a managed object or a pointer-sized payload.
+        const auto width = IsReferenceType(uint32_t(field.type)) ? 1 : typeImpls[types[field.type].implIndex].fieldSize;
+        if (width <= 0)
+            return nullptr;
+        const auto index = (field.initHi << 10) | (impl.initMid << 6) | impl.initLo;
+        const auto* data = initializers.empty() ? static_cast<const int32_t*>(header.initData) : initializers.data();
+        const auto count =
+            initializers.empty() ? size_t(header.numInitData > 0 ? header.numInitData : 0) : initializers.size();
+        if (!data || index >= count)
+            return nullptr;
+        const auto offset = int64_t(data[index]);
+        const auto position = size_t(offset < 0 ? -offset : offset);
+        const auto size = offset < 0 ? strings.size() : bytes.size();
+        if (!offset || position > size || size - position < width)
+            return nullptr;
+        return offset < 0 ? static_cast<const void*>(strings.data() + position) : bytes.data() + position;
     }
 
     bool TypeDatabase::IsRuntimeTypeReady(const RuntimeType& type) const {

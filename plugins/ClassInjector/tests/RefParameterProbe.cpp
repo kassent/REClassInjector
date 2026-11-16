@@ -1,8 +1,8 @@
-#include <Windows.h>
-#include "ClassProvider.h"
-#include <GameTypes.h>
-#include "TypeDatabaseRecords.h"
 #include "NativeCallProbe.h"
+#include "TypeDatabaseRecords.h"
+#include <GameTypes.h>
+#include <Windows.h>
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <sol/sol.hpp>
 

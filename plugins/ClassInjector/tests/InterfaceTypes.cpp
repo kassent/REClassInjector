@@ -1,4 +1,4 @@
-#include "ClassProvider.h"
+#include <ci/Provider.hpp>
 #include <reframework/API.hpp>
 
 using ManagedObject = reframework::API::ManagedObject;
@@ -25,12 +25,12 @@ int32_t CompareProbe(void* vmctx, ManagedObject* self, ManagedObject* other) noe
 }
 
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction("DisposeProbe", &DisposeProbe, 1)
-        .RegisterFunction("DisposeDerivedProbe", &DisposeDerivedProbe, 1)
-        .RegisterFunction("MoveNextProbe", &MoveNextProbe, 1)
-        .RegisterFunction("CurrentProbe", &CurrentProbe, 1)
-        .RegisterFunction("ResetProbe", &ResetProbe, 1)
-        .RegisterFunction("EnumeratorProbe", &EnumeratorProbe, 1)
-        .RegisterFunction("SelfProbe", &SelfProbe, 1)
-        .RegisterFunction("CompareProbe", &CompareProbe, 1);
+    registration.register_func("DisposeProbe", &DisposeProbe, 1)
+        .register_func("DisposeDerivedProbe", &DisposeDerivedProbe, 1)
+        .register_func("MoveNextProbe", &MoveNextProbe, 1)
+        .register_func("CurrentProbe", &CurrentProbe, 1)
+        .register_func("ResetProbe", &ResetProbe, 1)
+        .register_func("EnumeratorProbe", &EnumeratorProbe, 1)
+        .register_func("SelfProbe", &SelfProbe, 1)
+        .register_func("CompareProbe", &CompareProbe, 1);
 }

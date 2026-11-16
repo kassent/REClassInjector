@@ -30,13 +30,15 @@ if(BUILD_TESTING)
     add_test(NAME ci.enums COMMAND ClassInjectorEnumMetadataTests)
     add_test(NAME ci.provider-abi COMMAND ClassInjectorProviderAbiTests
         $<TARGET_FILE:ClassInjectorLegacyProvider> $<TARGET_FILE:ClassInjectorMismatchedProvider>
-        $<TARGET_FILE:CIExampleProvider>)
+        $<TARGET_FILE:CIExampleProvider> $<TARGET_FILE:ClassInjectorAbiOneProvider>
+        $<TARGET_FILE:ClassInjectorAbiTwoProvider>)
     add_test(NAME ci.hid COMMAND HIDWrapperTests $<TARGET_FILE:HIDWrapper>)
+    add_test(NAME ci.provider-sdk COMMAND ClassInjectorProviderSDKTests $<TARGET_FILE:ClassInjectorFinalPhaseProvider>)
     add_test(NAME common.virtual-call COMMAND CommonManagedVirtualCallTests)
     add_test(NAME common.allocation COMMAND CommonManagedAllocationTests)
     add_custom_target(check
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C $<CONFIG>
         DEPENDS ClassInjectorTests ClassInjectorFieldLayoutTests ClassInjectorEnumMetadataTests
-            ClassInjectorProviderAbiTests HIDWrapperTests HIDWrapper
+            ClassInjectorProviderAbiTests ClassInjectorProviderSDKTests HIDWrapperTests HIDWrapper
             CommonManagedVirtualCallTests CommonManagedAllocationTests)
 endif()

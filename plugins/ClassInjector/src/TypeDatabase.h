@@ -1,8 +1,8 @@
 #pragma once
-#include "ClassProvider.h"
-#include "TypeDatabaseRecords.h"
 #include "InvokeAdapters.h"
+#include "TypeDatabaseRecords.h"
 #include <GameTypes.h>
+#include <ci/Provider.h>
 #include <memory>
 #include <shared_mutex>
 #include <span>
@@ -14,6 +14,7 @@
 class BranchTrampoline;
 
 namespace ci {
+    using Type = RE::RETypeDefinition;
     // customMethods 按追加 method ID 连续排列。entry 是引擎可调用的入口，不是 provider 的直接导出。
     struct RuntimeMethod {
         uint32_t index{};
@@ -73,9 +74,9 @@ namespace ci {
         // 与 RF 一样缓存匹配的声明（包括未找到），不缓存会被 hook 改写的入口地址。
         mutable std::shared_mutex methodQueryMutex;
         mutable std::unordered_map<const Type*, std::unordered_map<std::string, const MethodDef*>> methodQueries;
-        // 发布后的布局不可变；unordered_map rehash 不使元素指针失效。
-        mutable std::shared_mutex fieldQueryMutex;
-        mutable std::unordered_map<const Type*, std::unordered_map<std::string, FieldLayout>> fieldQueries;
+        // Published names own their buffers; rehash preserves pointers to elements.
+        mutable std::shared_mutex nameQueryMutex;
+        mutable std::unordered_map<uint32_t, std::string> fullNameQueries;
         // builder 已创建运行时形状；原生 member entry 仍由外层初始化随后安装。
         bool runtimeTypesReady{};
 
@@ -87,6 +88,7 @@ namespace ci {
         RuntimeMethod* FindMethod(uint32_t index);
         uint32_t ResolveType(std::string_view name) const;
         std::string GetFullName(uint32_t index) const;
+        const char* GetFullNameData(uint32_t index) const;
         // 存储分类：对象/数组/字符串/委托均按托管引用占槽，不根据名称猜测。
         bool IsReferenceType(uint32_t index) const;
         // 已有枚举身份、I4 编码和 4 字节 payload 同时成立，供枚举编辑与 ABI 策略复用。
@@ -111,10 +113,8 @@ namespace ci {
         const MethodDef* GetMethodDef(const Type* type, std::string_view signature) const;
         // 沿父链查询实例字段记录，不访问 ObjectInfo；构建期和运行期共用。
         const FieldDef* GetFieldDef(const Type* type, std::string_view name) const;
-        // 返回数据库持有的缓存布局；未找到返回 nullptr。
-        const FieldLayout* GetFieldLayout(const Type* type, std::string_view name) const;
-        // 直接计算布局并写入 result，不缓存；未找到返回 false。
-        bool TryGetFieldLayout(const Type* type, std::string_view name, FieldLayout& result) const;
+        const FieldDef* FindFieldDeclaration(const Type* type, std::string_view name) const;
+        const void* GetFieldInitializer(const FieldDef& field) const;
         // 类型与接口关系：同类型、父类链或已构建的接口列表，不实现泛型变型。
         bool IsAssignable(uint32_t source, uint32_t target) const;
         // Borrowed byte-pool view; invalidated by appending to the pool during construction.

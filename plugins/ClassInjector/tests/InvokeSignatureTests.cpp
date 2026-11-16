@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <type_traits>
 #ifdef CI_INVOKE_SIGNATURE_PROVIDER
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <sol/sol.hpp>
 #endif
@@ -246,16 +247,16 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
 }
 CI_REGISTER_PROVIDER(registration) {
     using namespace ClassInjectorSignatureTests;
-    registration.RegisterFunction("Void", &ReturnMixed<void>, 1).RegisterFunction("Boolean", &ReturnMixed<bool>, 1);
-    registration.RegisterFunction("SByte", &ReturnMixed<int8_t>, 1).RegisterFunction("Byte", &ReturnMixed<uint8_t>, 1);
-    registration.RegisterFunction("Int16", &ReturnMixed<int16_t>, 1).RegisterFunction("UInt16", &ReturnMixed<uint16_t>, 1);
-    registration.RegisterFunction("Char", &ReturnMixed<uint16_t>, 1).RegisterFunction("Int32", &ReturnMixed<int32_t>, 1);
-    registration.RegisterFunction("UInt32", &ReturnMixed<uint32_t>, 1).RegisterFunction("Int64", &ReturnMixed<int64_t>, 1);
-    registration.RegisterFunction("UInt64", &ReturnMixed<uint64_t>, 1).RegisterFunction("Single", &ReturnMixed<float>, 1);
-    registration.RegisterFunction("Double", &ReturnMixed<double>, 1).RegisterFunction("Object", &ReturnMixed<void*>, 1);
-    registration.RegisterFunction("Category", &ReturnMixed<Category>, 1).RegisterFunction("String", &ReturnMixed<void*>, 1);
-    registration.RegisterFunction("Array", &ReturnMixed<void*>, 1).RegisterFunction("Reverse", &Reverse, 1);
-    registration.RegisterFunction("Zero", &Zero, 1).RegisterFunction("One", &One, 1);
+    registration.register_func("Void", &ReturnMixed<void>, 1).register_func("Boolean", &ReturnMixed<bool>, 1);
+    registration.register_func("SByte", &ReturnMixed<int8_t>, 1).register_func("Byte", &ReturnMixed<uint8_t>, 1);
+    registration.register_func("Int16", &ReturnMixed<int16_t>, 1).register_func("UInt16", &ReturnMixed<uint16_t>, 1);
+    registration.register_func("Char", &ReturnMixed<uint16_t>, 1).register_func("Int32", &ReturnMixed<int32_t>, 1);
+    registration.register_func("UInt32", &ReturnMixed<uint32_t>, 1).register_func("Int64", &ReturnMixed<int64_t>, 1);
+    registration.register_func("UInt64", &ReturnMixed<uint64_t>, 1).register_func("Single", &ReturnMixed<float>, 1);
+    registration.register_func("Double", &ReturnMixed<double>, 1).register_func("Object", &ReturnMixed<void*>, 1);
+    registration.register_func("Category", &ReturnMixed<Category>, 1).register_func("String", &ReturnMixed<void*>, 1);
+    registration.register_func("Array", &ReturnMixed<void*>, 1).register_func("Reverse", &Reverse, 1);
+    registration.register_func("Zero", &Zero, 1).register_func("One", &One, 1);
 }
 #endif
 

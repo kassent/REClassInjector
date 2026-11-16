@@ -1,8 +1,8 @@
-#include "ClassProvider.h"
 #include "NativeCallProbe.h"
 #include <GameTypes.h>
-#include <reframework/API.hpp>
+#include <ci/Provider.hpp>
 #include <immintrin.h>
+#include <reframework/API.hpp>
 
 using ManagedObject = reframework::API::ManagedObject;
 
@@ -31,25 +31,36 @@ extern "C" __declspec(dllexport) const NativeCallProbe* GetNativeCallProbe() noe
 extern "C" __declspec(dllexport) const EarlyQueryProbe* GetEarlyQueryProbe() noexcept {
     return &g_queries;
 }
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
+
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
     ++g_queries.notifications;
     g_queries.sdkInitializedAtReady = g_queries.sdkInitialized;
     g_queries.context = context;
-    auto* prefab = context->GetType("via.Prefab");
-    auto* arg = context->GetType("ClassInjector.Tests.Arg");
-    auto* derived = context->GetType("ClassInjector.Tests.DerivedArg");
-    auto* cmd = context->GetType("ClassInjector.Tests.Cmd");
+    auto* prefab = context->sdk->tdb->find_type("via.Prefab");
+    auto* arg = context->sdk->tdb->find_type("ClassInjector.Tests.Arg");
+    auto* derived = context->sdk->tdb->find_type("ClassInjector.Tests.DerivedArg");
+    auto* cmd = context->sdk->tdb->find_type("ClassInjector.Tests.Cmd");
     g_queries.originalType = prefab;
     g_queries.customType = arg;
-    g_queries.originalMethod = context->GetMethod(prefab, "instantiate(via.vec3)");
-    g_queries.originalOverload = context->GetMethod(prefab, "instantiate(via.vec3, via.Folder)");
-    g_queries.echo = context->GetMethod(arg, "Echo(ClassInjector.Tests.Arg)");
-    g_queries.outId = context->GetMethod(arg, "TryGetId(System.Int32, System.Int32)");
-    g_queries.inheritedEcho = context->GetMethod(derived, "Echo(ClassInjector.Tests.Arg)");
-    g_queries.constructor = context->GetMethod(arg, ".ctor()");
-    g_queries.genericMethod = context->GetMethod(cmd, "onExecute(ace.btable.cCommandWork, ClassInjector.Tests.Arg)");
-    g_queries.missingQueriesAreNull = !context->GetType("Tests.Missing") && !context->GetMethod(arg, "Missing") &&
-                                      !context->GetMethod(arg, "TryGetId(System.Int32, System.Int32&)");
+    g_queries.originalMethod =
+        context->sdk->method->get_function(context->sdk->type_definition->find_method(prefab, "instantiate(via.vec3)"));
+    g_queries.originalOverload = context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(prefab, "instantiate(via.vec3, via.Folder)"));
+    g_queries.echo = context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(arg, "Echo(ClassInjector.Tests.Arg)"));
+    g_queries.outId = context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(arg, "TryGetId(System.Int32, System.Int32)"));
+    g_queries.inheritedEcho = context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(derived, "Echo(ClassInjector.Tests.Arg)"));
+    g_queries.constructor =
+        context->sdk->method->get_function(context->sdk->type_definition->find_method(arg, ".ctor()"));
+    g_queries.genericMethod = context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(cmd, "onExecute(ace.btable.cCommandWork, ClassInjector.Tests.Arg)"));
+    g_queries.missingQueriesAreNull =
+        !context->sdk->tdb->find_type("Tests.Missing") &&
+        !context->sdk->method->get_function(context->sdk->type_definition->find_method(arg, "Missing")) &&
+        !context->sdk->method->get_function(
+            context->sdk->type_definition->find_method(arg, "TryGetId(System.Int32, System.Int32&)"));
 }
 ManagedObject* WideEcho(void* vmctx, ManagedObject* self, ManagedObject* argument) noexcept {
     g_call = {vmctx, self, uintptr_t(argument), 0};
@@ -170,24 +181,24 @@ int32_t FillValueFields(void*, ManagedObject*, ManagedObject* target, int32_t se
 }
 
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction("UpdateTableInplProbe", &UpdateTableInplProbe, 1);
-    registration.RegisterFunction("DerivedUpdateTableInplProbe", &DerivedUpdateTableInplProbe, 1);
-    registration.RegisterFunction("WideEcho", &WideEcho, 1)
-        .RegisterFunction("AggregateProbe", &AggregateProbe, 1)
-        .RegisterFunction("SetPeer", &SetPeer, 1)
-        .RegisterFunction("SetText", &SetText, 1)
-        .RegisterFunction("SetExtensionPeer", &SetExtensionPeer, 1)
-        .RegisterFunction("OnExecuteProbe", &OnExecuteProbe, 1)
-        .RegisterFunction("TryGetId", &TryGetId, 1)
-        .RegisterFunction("TryGetScale", &TryGetScale, 1)
-        .RegisterFunction("TryGetPeer", &TryGetPeer, 1)
-        .RegisterFunction("TryGetPair", &TryGetPair, 1)
-        .RegisterFunction("TryGetNumber", &TryGetNumber, 1)
-        .RegisterFunction("TryGetDerivedNumber", &TryGetDerivedNumber, 1)
-        .RegisterFunction("BehaviorAwake", &BehaviorAwake, 1)
-        .RegisterFunction("BehaviorStart", &BehaviorStart, 1)
-        .RegisterFunction("BehaviorUpdate", &BehaviorUpdate, 1)
-        .RegisterFunction("BehaviorLateUpdate", &BehaviorLateUpdate, 1)
-        .RegisterFunction("BehaviorOnDestroy", &BehaviorOnDestroy, 1)
-        .RegisterFunction("FillValueFields", &FillValueFields, 1);
+    registration.register_func("UpdateTableInplProbe", &UpdateTableInplProbe, 1);
+    registration.register_func("DerivedUpdateTableInplProbe", &DerivedUpdateTableInplProbe, 1);
+    registration.register_func("WideEcho", &WideEcho, 1)
+        .register_func("AggregateProbe", &AggregateProbe, 1)
+        .register_func("SetPeer", &SetPeer, 1)
+        .register_func("SetText", &SetText, 1)
+        .register_func("SetExtensionPeer", &SetExtensionPeer, 1)
+        .register_func("OnExecuteProbe", &OnExecuteProbe, 1)
+        .register_func("TryGetId", &TryGetId, 1)
+        .register_func("TryGetScale", &TryGetScale, 1)
+        .register_func("TryGetPeer", &TryGetPeer, 1)
+        .register_func("TryGetPair", &TryGetPair, 1)
+        .register_func("TryGetNumber", &TryGetNumber, 1)
+        .register_func("TryGetDerivedNumber", &TryGetDerivedNumber, 1)
+        .register_func("BehaviorAwake", &BehaviorAwake, 1)
+        .register_func("BehaviorStart", &BehaviorStart, 1)
+        .register_func("BehaviorUpdate", &BehaviorUpdate, 1)
+        .register_func("BehaviorLateUpdate", &BehaviorLateUpdate, 1)
+        .register_func("BehaviorOnDestroy", &BehaviorOnDestroy, 1)
+        .register_func("FillValueFields", &FillValueFields, 1);
 }

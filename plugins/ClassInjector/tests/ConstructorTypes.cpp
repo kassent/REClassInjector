@@ -1,19 +1,20 @@
-#include "ClassProvider.h"
 #include <GameTypes.h>
 #include <HookUtils.h>
+#include <array>
+#include <ci/API.hpp>
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <sol/sol.hpp>
-#include <array>
 #include <stdexcept>
 
 // 显式测试 provider；仅通过测试目标部署，不进入生产 host。
 namespace ClassInjectorConstructorTests {
 static const ci::ProviderContext* ProviderContext{};
-using FnObjectCtor = void (*)(void*, void*);
+using FnObjectCtor = void (*)(void* vmContext, void* object);
 static FnObjectCtor ObjectCtor{};
 
 template <class T> static T& Field(void* self, const char* name) {
-    return *ProviderContext->GetField<T>(self, name);
+    return *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<T>(name);
 }
 
 // self 为 ClassInjector.Tests.CtorBase 或派生类。父调用和字段初始化完全归 provider。
@@ -31,8 +32,8 @@ static void MixedCtor(void* vmctx, void* self, float scale, void* peer, void* pa
     BaseValueCtor(vmctx, self, int32_t(scale * 100.0f));
     ++Field<int32_t>(self, "DerivedCount");
     Field<float>(self, "Scale") = scale;
-    ProviderContext->AssignReference(self, &Field<void*>(self, "Peer"), peer);
-    ProviderContext->AssignReference(self, &Field<void*>(self, "Payload"), payload);
+    ProviderContext->sdk->managed_object->assign_reference(self, &Field<void*>(self, "Peer"), peer);
+    ProviderContext->sdk->managed_object->assign_reference(self, &Field<void*>(self, "Payload"), payload);
 }
 static void DerivedDefaultCtor(void* vmctx, void* self) noexcept {
     MixedCtor(vmctx, self, 0.75f, nullptr, nullptr);
@@ -56,14 +57,16 @@ static void RefCtor(void* vmctx, void* self, int32_t* value) noexcept {
 static void Check(bool valid, const char* reason) {
     if (!valid) throw std::runtime_error(reason);
 }
-static void* Allocate(void* vmctx, const ci::Type* type) {
-    auto* self = ProviderContext->CreateInstance(vmctx, type, true);
+
+static void* Allocate(void* vmctx, ci::TypeDefinitionHandle type) {
+    auto* self = ProviderContext->sdk->managed_object->create_instance(vmctx, type, true);
     Check(self != nullptr, "CLR allocation failed");
-    ProviderContext->Retain(self); // 本测试调用持有一份，完成后显式释放；不改变分配/构造协议。
+    ProviderContext->sdk->managed_object->add_ref(self); // 本测试调用持有一份，完成后显式释放；不改变分配/构造协议。
     return self;
 }
 static void CheckInitialZero(void* self) {
-    const auto* type = ProviderContext->GetInstanceType(self);
+    const auto* type =
+        reinterpret_cast<const RE::RETypeDefinition*>(ProviderContext->sdk->managed_object->get_type_definition(self));
     auto** info = *static_cast<void***>(self);
     const auto offset = int32_t(intptr_t(info[-1]));
     const auto* bytes = static_cast<const uint8_t*>(self);
@@ -75,15 +78,20 @@ static sol::table Snapshot(sol::this_state state, uintptr_t address) {
     sol::state_view lua{state};
     auto result = lua.create_table();
     auto* self = reinterpret_cast<void*>(address);
-    const auto* type = ProviderContext->GetInstanceType(self);
+    const auto* type =
+        reinterpret_cast<const RE::RETypeDefinition*>(ProviderContext->sdk->managed_object->get_type_definition(self));
     result["type"] = type->index;
     result["defaultCtor"] = uint32_t(type->defaultCtorIndex);
     for (const auto* name : {"BaseCount", "BaseValue", "Sentinel", "DerivedCount", "A", "B", "C", "D", "E", "F", "Extra"})
-        if (auto* field = ProviderContext->GetField<int32_t>(self, name)) result[name] = *field;
+        if (auto* field = ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>(name))
+            result[name] = *field;
     result["Context"] = Field<uint64_t>(self, "Context");
-    if (auto* field = ProviderContext->GetField<float>(self, "Scale")) result["Scale"] = *field;
-    if (auto* field = ProviderContext->GetField<void*>(self, "Peer")) result["Peer"] = uintptr_t(*field);
-    if (auto* field = ProviderContext->GetField<void*>(self, "Payload")) result["Payload"] = uintptr_t(*field);
+    if (auto* field = ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<float>("Scale"))
+        result["Scale"] = *field;
+    if (auto* field = ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<void*>("Peer"))
+        result["Peer"] = uintptr_t(*field);
+    if (auto* field = ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<void*>("Payload"))
+        result["Payload"] = uintptr_t(*field);
     return result;
 }
 
@@ -93,13 +101,15 @@ static void InitializeLua(lua_State* state) {
     probe["snapshot"] = &Snapshot;
     probe["allocate"] = [](const char* name) {
         auto* vmctx = reframework::API::get()->get_vm_context();
-        const auto* type = ProviderContext->GetType(name);
+        const auto* type = ProviderContext->sdk->tdb->find_type(name);
         Check(type != nullptr, "probe allocation type missing");
         auto* self = Allocate(vmctx, type);
         CheckInitialZero(self);
         return uintptr_t(self);
     };
-    probe["release"] = [](uintptr_t address) { ProviderContext->Release(reinterpret_cast<void*>(address)); };
+    probe["release"] = [](uintptr_t address) {
+        ProviderContext->sdk->managed_object->release(reinterpret_cast<void*>(address));
+    };
     probe["native"] = [](sol::this_state state) {
         sol::state_view lua{state};
         auto result = lua.create_table();
@@ -108,13 +118,19 @@ static void InitializeLua(lua_State* state) {
         result["managedCount"] = RE::read_offset_data<uint32_t>(vmctx, 0x78);
         result["managedDepth"] = RE::read_offset_data<uint32_t>(vmctx, 0x7C);
         Check(result.get<uint32_t>("managedCount") > 0 && result.get<uint32_t>("managedDepth") > 0, "probe needs a native managed call scope");
-        const auto* type = ProviderContext->GetType("ClassInjector.Tests.CtorDerived");
-        using FnMixedCtor = void (*)(void*, void*, float, void*, void*);
-        using FnSixCtor = void (*)(void*, void*, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
-        using FnRefCtor = void (*)(void*, void*, int32_t*);
-        const auto mixed = reinterpret_cast<FnMixedCtor>(ProviderContext->GetMethod(type, ".ctor(System.Single, System.Object, System.Object)"));
-        const auto six = reinterpret_cast<FnSixCtor>(ProviderContext->GetMethod(type, ".ctor(System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32)"));
-        const auto ref = reinterpret_cast<FnRefCtor>(ProviderContext->GetMethod(type, ".ctor(System.Int32)"));
+        const auto* type = ProviderContext->sdk->tdb->find_type("ClassInjector.Tests.CtorDerived");
+        using FnMixedCtor = void (*)(void* vmContext, void* object, float value, void* firstObject, void* secondObject);
+        using FnSixCtor = void (*)(void* vmContext, void* object, int32_t firstValue, int32_t secondValue,
+                                   int32_t thirdValue, int32_t fourthValue, int32_t fifthValue, int32_t sixthValue);
+        using FnRefCtor = void (*)(void* vmContext, void* object, int32_t* value);
+        const auto mixed = reinterpret_cast<FnMixedCtor>(
+            ProviderContext->sdk->method->get_function(ProviderContext->sdk->type_definition->find_method(
+                type, ".ctor(System.Single, System.Object, System.Object)")));
+        const auto six = reinterpret_cast<FnSixCtor>(
+            ProviderContext->sdk->method->get_function(ProviderContext->sdk->type_definition->find_method(
+                type, ".ctor(System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32)")));
+        const auto ref = reinterpret_cast<FnRefCtor>(ProviderContext->sdk->method->get_function(
+            ProviderContext->sdk->type_definition->find_method(type, ".ctor(System.Int32)")));
         Check(mixed && six && ref, "parameterized ctor entry missing");
         // 三个显式入口均为 FF25 直跳；没有 host 参数包装，也没有隐式父调用。
         for (auto* entry : {reinterpret_cast<void*>(mixed), reinterpret_cast<void*>(six), reinterpret_cast<void*>(ref)}) {
@@ -147,19 +163,23 @@ static void InitializeLua(lua_State* state) {
             result["noHostClear"] = true;
             result["parentExactlyOnce"] = true;
         } catch (...) {
-            for (auto* self : objects) if (self) ProviderContext->Release(self);
+            for (auto* self : objects)
+                if (self)
+                    ProviderContext->sdk->managed_object->release(self);
             throw;
         }
-        for (auto* self : objects) ProviderContext->Release(self);
+        for (auto* self : objects)
+            ProviderContext->sdk->managed_object->release(self);
         return result;
     };
 }
 } // namespace ClassInjectorConstructorTests
 
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
     using namespace ClassInjectorConstructorTests;
     ProviderContext = context;
-    ObjectCtor = reinterpret_cast<FnObjectCtor>(context->GetMethod(context->GetType("System.Object"), ".ctor()"));
+    ObjectCtor = reinterpret_cast<FnObjectCtor>(context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(context->sdk->tdb->find_type("System.Object"), ".ctor()")));
 }
 extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFrameworkPluginInitializeParam* parameter) {
     reframework::API::initialize(parameter);
@@ -169,10 +189,10 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
 }
 CI_REGISTER_PROVIDER(registration) {
     using namespace ClassInjectorConstructorTests;
-    registration.RegisterFunction("BaseDefaultCtor", &BaseDefaultCtor, 1)
-        .RegisterFunction("BaseValueCtor", &BaseValueCtor, 1)
-        .RegisterFunction("MixedCtor", &MixedCtor, 1)
-        .RegisterFunction("DerivedDefaultCtor", &DerivedDefaultCtor, 1)
-        .RegisterFunction("SixCtor", &SixCtor, 1)
-        .RegisterFunction("RefCtor", &RefCtor, 1);
+    registration.register_func("BaseDefaultCtor", &BaseDefaultCtor, 1)
+        .register_func("BaseValueCtor", &BaseValueCtor, 1)
+        .register_func("MixedCtor", &MixedCtor, 1)
+        .register_func("DerivedDefaultCtor", &DerivedDefaultCtor, 1)
+        .register_func("SixCtor", &SixCtor, 1)
+        .register_func("RefCtor", &RefCtor, 1);
 }

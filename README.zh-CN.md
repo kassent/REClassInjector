@@ -1,6 +1,6 @@
 # ClassInjector 开发者指南
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [Public SDK header](include/ClassProvider.h)
+[English](README.md) | [简体中文](README.zh-CN.md) | [Provider SDK](include/ci/Provider.hpp)
 [Build from source / 从源码构建](BUILDING.md)
 
 **更早接入游戏初始化，让 Mod 拥有自己的组件、数据和原生行为。**
@@ -22,7 +22,7 @@ ClassInjector（下文简称 CI）是面向 RE Engine Mod 开发者的**早期�
 - [7. 字段、引用与资源](#7-字段引用与资源)
 - [8. 扩展已有类型与枚举](#8-扩展已有类型与枚举)
 - [9. 泛型与数组](#9-泛型与数组)
-- [10. 初始化与 ProviderContext API](#10-初始化与-providercontext-api)
+- [10. 初始化与 Provider SDK API](#10-初始化与-provider-sdk-api)
 - [11. 兼容性、诊断与交付](#11-兼容性诊断与交付)
 - [12. 常见问题](#12-常见问题)
 
@@ -42,7 +42,7 @@ ClassInjector（下文简称 CI）是面向 RE Engine Mod 开发者的**早期�
 
 ### 1.2 CI 也是一个更早介入的插件 loader
 
-CI 不只是“添加 class 的工具”。它还负责提前加载参与 CI 流程的 provider，并提供一个**在类型系统可用后立即接入后续初始化**的通知入口：`ci_on_tdb_ready`。
+CI 不只是“添加 class 的工具”。它还负责提前加载参与 CI 流程的 provider，并提供一个**在类型系统可用后立即接入后续初始化**的通知入口：`ci_on_initialize`。
 
 该通知发生于 **TDB 类型及原生方法入口就绪之后、全局静态构造执行之前**。插件因此可以先查询所需类型和方法、准备自己的入口、安装需要赶在初始化之前生效的 hook，再让引擎继续正常初始化。
 
@@ -55,8 +55,10 @@ CI 不只是“添加 class 的工具”。它还负责提前加载参与 CI 流
   │
   ├─ 引擎建立 TDB，完成类型与原生方法入口准备
   │    │
-  │    └─ CI：ci_on_tdb_ready(context)
-  │         插件查询入口、准备接入，影响随后尚未执行的初始化
+  │    ├─ CI：全部 provider 的 ci_on_initialize(context)
+  │    │    查询入口、准备接入；向 UDE 提交依赖 TDB 的声明
+  │    └─ CI：全部 provider 的 ci_on_post_initialize(context)
+  │         UDE 关闭登记、校验声明并安装解码 hook
   │
   ├─ 继续全局静态构造等初始化
   │    类型列表、静态表和缓存等在各自的初始化流程中建立
@@ -152,7 +154,7 @@ CI 提供时机与类型能力；具体业务系统如何接收新增内容，�
 
 | 能力 | 可以实现的效果 | 使用条件或边界 |
 |---|---|---|
-| 早期插件加载与通知 | 在 TDB/原生入口就绪后、后续关键初始化之前接入逻辑 | 使用 CI 配对加载与 `ci_on_tdb_ready`；不等于 RF SDK 已就绪 |
+| 早期插件加载与通知 | 在 TDB/原生入口就绪后、后续关键初始化之前接入逻辑 | 使用 CI 配对加载与 `ci_on_initialize`；不等于 RF SDK 已就绪 |
 | 新增托管 class | 独立数据对象、参数类型、行为实现 | 基类与实际调用路径须兼容 |
 | 字段 | 标量、托管引用、已有 ValueType 内嵌字段 | 不等于可以新增任意 struct 定义 |
 | 方法与构造 | 实例方法、构造重载、虚方法、覆盖和抽象方法 | 方法实现使用 C++ binding；签名须满足引擎调用约定 |
@@ -232,10 +234,11 @@ binding = { function = "Example.Counter.Add(System.Int32)", version = 1 }
 
 ### 4.2 编写 provider 方法
 
-使用随开发接口提供的 `ClassProvider.h`。本例仅使用 ProviderContext，不依赖 REFramework SDK：
+使用随开发接口提供的 `ci/Provider.hpp`。本例仅使用 ProviderContext，不依赖 REFramework SDK：
 
 ```cpp
-#include <ClassProvider.h>
+#include <ci/Provider.hpp>
+#include <ci/API.hpp>
 #include <cstdint>
 #include <cstdio>
 
@@ -246,7 +249,7 @@ namespace Example::Counter {
     static int32_t Add(void* vmctx, void* self, int32_t delta) noexcept {
         (void)vmctx;
         auto* value = g_context
-            ? g_context->GetField<int32_t>(self, "Value")
+            ? ci::API::ManagedObject{g_context->sdk, self}.get_field<int32_t>("Value")
             : nullptr;
         if (!value) {
             std::fputs("CounterPlugin: Value field unavailable\n", stderr);
@@ -258,9 +261,8 @@ namespace Example::Counter {
 }
 
 extern "C" __declspec(dllexport)
-void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
-    if (!context || !context->GetType || !context->GetFieldLayout ||
-        !context->GetInstanceType || !context->GetRawField) {
+void ci_on_initialize(const ci::ProviderContext* context) noexcept {
+    if (!context || !context->sdk || !context->sdk->managed_object || !context->sdk->field) {
         std::fputs("CounterPlugin: required ProviderContext service unavailable\n", stderr);
         return;
     }
@@ -269,7 +271,7 @@ void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
 
 // 每个实现 DLL 只在一个 .cpp 中使用一次。
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction(
+    registration.register_func(
         "Example.Counter.Add(System.Int32)", &Example::Counter::Add, 1);
 }
 ```
@@ -364,10 +366,12 @@ end, nil)
 
 ### 5.4 参数与原生签名
 
-常见实例方法形态：
+以第 4 节 Counter.Add 的完整原生签名为例：
 
 ```cpp
-ReturnType Method(void* vmctx, void* self, ExplicitArgs...) noexcept;
+#include <cstdint>
+
+int32_t Add(void* vmContext, void* self, int32_t delta) noexcept;
 ```
 
 `self` 可以在使用 SDK 的实现中声明为对应的托管对象指针类型。它不指向普通 C++ 业务类；类型声明也不从 C++ 函数指针自动推导。
@@ -390,7 +394,7 @@ binding = { function = "Example.Counter.TryGetValue(System.Int32)", version = 1 
 
 ### 5.5 绑定版本
 
-`binding.version` 与 `.RegisterFunction(..., version)` 的数值必须完全相等。它是**单个方法的契约版本**，不是 TOML 格式版本，也不是 DLL 的整体版本。
+`binding.version` 与 `.register_func(..., version)` 的数值必须完全相等。它是**单个方法的契约版本**，不是 TOML 格式版本，也不是 DLL 的整体版本。
 
 修改参数、返回类型或调用契约时，应同步调整声明、实现和版本，并核对 C++ 签名与托管声明的对应关系。
 
@@ -431,14 +435,14 @@ binding = { function = "Example.Counter.TryGetValue(System.Int32)", version = 1 
 ProviderContext 字段访问返回的是字段槽地址：
 
 ```cpp
-auto* value = context->GetField<int32_t>(object, "Value"); // int32_t*
-auto** peer = context->GetField<void*>(object, "Peer");  // void**
+auto* value = ci::API::ManagedObject{context->sdk, object}.get_field<int32_t>("Value"); // int32_t*
+auto** peer = ci::API::ManagedObject{context->sdk, object}.get_field<void*>("Peer");  // void**
 ```
 
 模板参数由调用方保证正确，不自动校验字段类型。先确认字段契约，再读写数据；字段地址仅在所属对象有效期间使用。
 
 - POD 标量可以按准确类型写入对应槽。
-- 托管引用字段使用 `AssignReference(owner, field, value)`，而不是裸赋值绕过引用管理。
+- 托管引用字段使用 `ci::API{*context->sdk}.objects().assign_reference(owner, field, value)`，而不是裸赋值绕过引用管理；field 是引用槽 `void**`，检查返回的成功状态。
 - 需要跨回调保存对象时，按取得对象的接口契约持有和释放；裸指针、局部 Lua/C++ 变量不等于永久持有。
 - 清理外部持有的引用时，确保相关回调已经停止使用对象，再按取得引用的契约释放。
 
@@ -446,7 +450,7 @@ auto** peer = context->GetField<void*>(object, "Peer");  // void**
 
 字段可以使用 TDB 中已有的 ValueType，例如 `via.vec3` 和 `System.Guid`。它们保存的是内嵌 payload，不是装箱对象指针。
 
-整体复制时，使用真实的 payload 长度和相应字段写入方式。`GetValueTypeSize` 返回已闭合值类型的 payload 大小；对非值类型或无布局返回 0。包装对象的大小与内嵌 payload 大小不同；含托管引用的结构体还需要遵循引用管理契约。
+整体复制时，使用真实的 payload 长度和相应字段写入方式。`get_valuetype_size` 返回已闭合值类型的 payload 大小；对非值类型或无布局返回 0。包装对象的大小与内嵌 payload 大小不同；含托管引用的结构体还需要遵循引用管理契约。
 
 ### 7.3 资源序列化字段
 
@@ -512,7 +516,7 @@ appends = [{ name = "Example_ExtraDay", value = 7 }]
 - 追加使用 `name` 与 Int32 `value`，重名报错；不覆盖原成员。
 - 同值别名不会替换原 canonical 名称；按值查名仍取首个匹配成员。
 - 单条声明先执行改名，再执行追加。变更后完整重启。
-- 也可在 `CI_REGISTER_PROVIDER` 中使用 `registration.ExtendEnum(...)` 提供动态登记。
+- 也可在 `CI_REGISTER_PROVIDER` 中使用 `registration.register_enum(...)` 提供动态登记。
 
 追加业务 ID 时，同步为使用该 ID 的表、资源或工厂提供对应条目。
 
@@ -535,103 +539,112 @@ appends = [{ name = "Example_ExtraDay", value = 7 }]
 
 新增数组类型限单维 class 引用数组；新值类型数组、多维数组、jagged 数组、数组协变及完整泛型数组接口不在支持范围内。对于引擎已有的值数组类型，可通过 ProviderContext 的 `CreateArray` 分配实例。
 
-## 10. 初始化与 ProviderContext API
+## 10. 初始化与 Provider SDK API
 
-### 10.1 插件加载与业务接入的三个阶段
+### 10.1 公共头、登记与版本
 
-| 阶段 | provider 应做什么 | 不应假定什么 |
-|---|---|---|
-| 早期加载与函数登记 | CI 加载 provider，登记函数地址、版本及需要的枚举扩展 | VM、业务单例和 REFramework SDK 已就绪 |
-| `ci_on_tdb_ready` | 在全局静态构造之前查询类型/方法/字段，准备初始化接入，保存 ProviderContext 并检查所需服务 | 所有业务静态对象已构造，或已自动获得托管调用作用域 |
-| 正常业务生命周期 | 在适当的原生调用链使用对象和资源 | 任意线程、IPC 或帧回调都可替代正确的生命周期 |
+| 头文件 | 用途 |
+|---|---|
+| `ci/Provider.h` | `ProviderContext`、`RegistrationAPI` 和枚举登记的 POD 协议 |
+| `ci/Provider.hpp` | 本 DLL 内的 `Registration`、`EnumChanges` 和 `CI_REGISTER_PROVIDER` |
+| `ci/API.h` | 六组 `SDKAPI` 函数表及不透明句柄 |
+| `ci/API.hpp` | 本 DLL 内的 `ci::API` 值视图与 vector 包装 |
 
-`ci_on_tdb_ready(const ci::ProviderContext*) noexcept` 是可选导出，每个有效 provider 在就绪后收到一次通知。ProviderContext 和其中的类型/字段描述是运行时持有的借用数据，调用方不释放它们。
+每个 provider DLL 只在一个 `.cpp` 中使用一次 `CI_REGISTER_PROVIDER(registration)`。宏生成 `ci_get_sdk_abi` 与 `ci_register_provider` 两个 C 导出。`RegistrationAPI` 和 `Registration` 只在本次登记调用中有效，不保存到后续回调；宿主同步复制输入，登记错误累计后使导出返回失败。
 
-对依赖首次初始化的功能，应把“必须在初始化前完成的入口查询和接入准备”放在这一阶段，而不是等普通插件初始化或首个帧回调后再做。另一方面，依赖已经存在的场景、玩家或业务单例的操作，应等到相应对象的真实生命周期，不在早期通知中强行执行。
-
-**TDB ready 与 REFramework SDK ready 是两件事。** 仅使用 ProviderContext 的 provider 不需要为了查询类型而初始化 SDK；使用 REFramework C++ API 的 DLL 则需要自身完成标准初始化，CI 不转发该初始化。
-
-### 10.2 只使用 CI 作为早期 loader
-
-不新增类型的插件，也可以通过同名 TOML 参与 CI 加载。例如，将 `EarlyPlugin.dll` 与 `EarlyPlugin.toml` 一同放入 `reframework/plugins/`；TOML 可以仅作为加载标识：
-
-```toml
-# EarlyPlugin.toml：不声明 types 或 enum，只参与早期加载。
-schema_version = 1
-```
-
-DLL 仍需要固定登记入口，即使没有业务函数需要登记；然后通过可选就绪回调接收 ProviderContext：
+下面是第 8.2 节 TOML 枚举示例的 **C++ 替代写法**，不要同时登记两份相同变更：
 
 ```cpp
-#include <ClassProvider.h>
-#include <cstdio>
+#include <ci/Provider.hpp>
 
 CI_REGISTER_PROVIDER(registration) {
-    (void)registration; // 本例只使用 loader，不登记新增类型的方法。
-}
-
-extern "C" __declspec(dllexport)
-void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
-    const auto* type = context->GetType("System.Object");
-    const auto constructor = type ? context->GetMethod(type, ".ctor()") : nullptr;
-    if (!constructor) {
-        std::fputs("EarlyPlugin: required method unavailable\n", stderr);
-        return;
-    }
-    std::fputs("EarlyPlugin: TDB entry available before static initialization\n", stderr);
-    // 在此查询本插件需要的真实入口并准备初始化接入。
-    // 本示例只查询方法，不创建对象、不调用构造，也不依赖 RF SDK。
+    registration.register_enum("System.DayOfWeek", {
+        .renames = {
+            ci::EnumRename::by_name("Tuesday", "Example_Tuesday"),
+            ci::EnumRename::by_value(4, "Example_Thursday")
+        },
+        .additions = {{"Example_ExtraDay", 7}}
+    });
 }
 ```
 
-本例将消息写入标准错误流，实际项目可使用自己的日志设施接收这些消息。将插件所需的方法查询和初始化接入放在 `ci_on_tdb_ready` 中，并记录失败原因。`DllMain`、静态全局对象构造和函数登记阶段只做不依赖 VM/SDK 的准备。
+未使用的 `renames` 或 `additions` 可以省略，不传空列表占位。`EnumChanges` 是调用侧参数，不将 initializer_list 或 STL 对象跨 DLL 保存。函数登记仍使用第 4 节的 `registration.register_func("完整绑定键", &实现函数, version)`。
 
-provider 同时使用 REFramework 能力时，CI 负责早期加载与就绪通知，REFramework 的标准插件初始化负责准备 SDK 相关功能。同一个模块按这两个阶段组织初始化。
+当前 SDK ABI 为 **3**，`ProviderContext` 只含 `const ci::SDKAPI* sdk`。ABI、TOML 的 `schema_version`、单个函数的 `binding.version` 是三个不同版本。ABI1/2 与当前宿主不兼容，须协调重编宿主及该实例所有 provider；本次公共头和 snake_case 命名重组保持 ABI3 布局不变。
 
-### 10.3 常用服务速查
-
-以下为语义摘要；准确参数类型以配套 `ClassProvider.h` 为准。
-
-| API | 用途与重要约定 |
-|---|---|
-| `GetType` | 按完整名称查询类型；未找到返回空 |
-| `GetMethod` | 按名称/签名查询方法入口，包含父类查询；不是对象虚分派 |
-| `GetFieldLayout` | 返回只读字段布局，不是字段值 |
-| `GetInstanceType` | 获取有效托管实例的类型 |
-| `GetRawField` | 根据 `FieldLayout` 获取实例字段的原始地址；也用于检查字段访问服务是否可用 |
-| `GetField<T>` | 获取实例字段槽地址；由调用方保证 `T` 正确 |
-| `IsDerivedFrom` | 检查同类型或父类链；不是接口兼容性检查 |
-| `IsEnum` | 判断具体枚举类型，不将 `System.Enum` 本身算作枚举实例类型 |
-| `GetValueTypeSize` | 查询已有闭合值类型的 payload 大小 |
-| `CreateInstance` | 分配对象；不隐式调用 `.ctor`，不额外 retain |
-| `CreateArray` | 分配托管数组；先填充，再首次 retain/发布 |
-| `CreateString` | 从 NUL 结尾的 UTF-8 创建字符串；不额外 retain |
-| `CreateAction` | 为兼容的方法创建 Action 委托；不额外 retain，不等于新增 delegate 类型 |
-| `Retain` / `Release` | 按接口取得对象的所有权契约成对使用；对象须非空 |
-| `AssignReference` | 正确更新托管引用字段；检查返回的成功状态 |
-| `CreateUserData` | 请求 USER；返回一份需释放的 owned 引用，不保证解码已完成 |
-| `CreateResourceHolder` | 请求资源并创建 holder；托管 holder 不额外 retain |
-| `DeserializeRsz` | 按公开输入/输出容器调用 RSZ reader；保留原生状态，输出根持有一份引用 |
-
-可选服务不可用时，对应函数指针为空。provider 应在启用功能前检查所需入口，并为缺少服务的情况提供清晰的错误信息。使用与运行时发行版本配套的 `ClassProvider.h`。
-
-### 10.4 方法查询写法
-
-建议使用完整签名消除重载歧义：
+### 10.2 两阶段初始化与零类型 provider
 
 ```text
-Add(System.Int32)
-SetPair(System.Int32, System.Object)
-.ctor()
+扫描同名 TOML/DLL，核 ci_get_sdk_abi，调用 ci_register_provider
+  → 登记函数/枚举，核对声明与绑定（此阶段不访问 VM 或 RF SDK）
+  → 发布类型，准备原生入口、自定义虚表与 ProviderContext
+  → 全部 provider 的 ci_on_initialize
+       查询元数据、安装早期接入；向 UDE 提交依赖 TDB 的 JSON
+  → 全部 provider 的 ci_on_post_initialize
+       UDE 关闭登记、验证声明并安装解码 hook
+  → 继续游戏全局静态构造
 ```
 
-名称区分大小写。参数之间使用逗号加一个空格，不带返回类型、参数名、隐式 `vmctx/self`，`ref/out` 查询不加 `&`。裸方法名会选择首个匹配声明，不适合依赖重载顺序的业务。
+两轮都是**全局静态构造之前**，不是每个 provider 的两个通知连续执行。不依赖 TOML 文件名排序，也没有通用依赖图。需要在 UDE 关闭登记前提交的调用方使用第一轮 `ci_on_initialize`，不要把提交放到自己的第二轮回调。
 
-### 10.5 托管作用域与持有
+两个通知导出均可省略；只导出后置通知的 UDE 也会被通知。签名如下：
 
-`vmctx` 应来自真实原生调用生命周期。取得线程上下文、切到主线程，或排入 `UpdateBehavior`，都不等于已经建立外层托管调用作用域。ProviderContext 不会替调用方补上这层边界。
+```cpp
+extern "C" __declspec(dllexport)
+void ci_on_initialize(const ci::ProviderContext* context) noexcept;
 
-创建对象、委托、组件以及触发更复杂引擎业务时，应接入相应原生生命周期。`forceHeapAllocation = true` 只影响分配位置，不会调用构造、自动持有对象或建立托管作用域。使用临时分配时，更要在有效作用域内完成填充和交给字段/事件等持有者，避免保存失效的裸指针。
+extern "C" __declspec(dllexport)
+void ci_on_post_initialize(const ci::ProviderContext* context) noexcept;
+```
+
+不新增类型也可作为早期 loader 使用：放置空的同名 TOML（或只有注释），并提供无业务登记的宏体，另按需实现通知：
+
+```cpp
+#include <ci/Provider.hpp>
+
+CI_REGISTER_PROVIDER(registration) {
+    // 零类型 provider；此处不访问 VM 或 RF SDK。
+}
+```
+
+早期通知不是 RF 插件初始化，也不表示游戏单例、业务缓存或资源已就绪。`ProviderContext`/SDK 表为宿主期借用数据，与只活到登记返回的 `RegistrationAPI` 不同。
+
+### 10.3 查询、字段和所有权
+
+公共查询不依赖 RF 初始化。以下函数只查询元数据与入口，不在早期通知中创建业务对象或执行构造：
+
+```cpp
+#include <ci/Provider.hpp>
+#include <ci/API.hpp>
+
+static bool HasObjectConstructor(const ci::ProviderContext& context) {
+    const ci::API api{*context.sdk};
+    const auto type = api.tdb().find_type("System.Object");
+    if (!type)
+        return false;
+    const auto method = type.find_method(".ctor()");
+    if (!method)
+        return false;
+    using FnConstructor = void (*)(void* vmContext, void* object);
+    return method.get_function<FnConstructor>() != nullptr;
+}
+```
+
+| 分组 | POD 表 / C++ 视图 | 契约 |
+|---|---|---|
+| 元数据 | `tdb`、`type_definition`、`field`、`method` / `api.tdb()` 及类型、字段、方法视图 | `find_method` 返回元数据；`get_function<准确签名>()` 取得原生入口 |
+| 对象 | `managed_object` / `api.objects()` | `create_instance` 不执行 .ctor、不 retain；`retain/release` 管理调用方持有；引用槽用 `assign_reference` |
+| 资源 | `resource_manager` / `api.resources()` | `create_userdata` 返回一份 owned 引用，但不承诺已解码；holder 的原生请求由其 finalizer 管理 |
+
+- `Field::get_data<T>()` 返回 **`T&`**；`ManagedObject::get_field<T>()` 返回 **`T*`**。模板参数由调用方核对，二者不要混用。
+- 实例字段按实际对象寻址；unboxed 的内嵌 payload 使用 `get_data_raw(payload, true)`。字段视图按值保存，字段地址只在对应对象有效期间使用；没有公共 `FieldLayout` 或 UDE 全局字段布局缓存。
+- `get_init_data()` 返回元数据 initializer 的借用字节地址，缺失为 `nullptr`；它不是运行时 static storage，也不保证每个字段都有数据。枚举常量先核 literal、类型与宽度再读；数值 0 不是“无 initializer”。
+- 底层 `get_fields/get_methods` 的 `out_size` 是**字节数**，`out_count` 是写入条目数；`ci::Result` 沿用 REF 整数约定（`ERROR_NONE == 0`）。C++ 包装在本 DLL 内管理 vector，不需自建 visitor。
+- `create_action(vmContext, actionType, target, method)` 接受真实 Method 句柄，不传 C++ 函数地址代替或改写委托函数槽。
+- API 不建立 VM 托管作用域。对象创建、方法执行沿真实原生生命周期使用；主线程、取得 VM context、裸 IPC 或 `UpdateBehavior` 本身都不是外层作用域证明。引用数组先初始化元素，再首次发布给持有者。
+- 可选入口未解析时可能为 `nullptr`，按实际所需服务检查。查询成功不代表业务对象、资源或 RF SDK 可用。
+
+方法查找仍遵循完整签名、逗号空格、父链和 ref/out 元素类型规则，不自动虚分派或执行构造。实现入口见 [Provider 公共头](include/ci/Provider.hpp)、[SDK 视图](include/ci/API.hpp)；完整 ABI 见 [SDK 函数表](include/ci/API.h)，提交示例见 [UDE 指南第 10 节](https://github.com/kassent/UserDataExtension/blob/main/README.zh-CN.md#10-插件开发者接口)。
 
 ## 11. 兼容性、诊断与交付
 
@@ -648,7 +661,7 @@ SetPair(System.Int32, System.Object)
 1. **检查文件配对**：同名 TOML/DLL 是否位于 `reframework/plugins/` 顶层，是否误放进子目录。
 2. **检查启动日志**：运行时日志位于 `logs/HIDWrapper.log`；使用 Mod 管理器时，按其文件重定向设置查找。确认日志来自本次启动。
 3. **检查声明与绑定**：查看 TOML 错误、缺失函数、版本错配和依赖失效信息。
-4. **检查就绪阶段**：确认类型注册记录、原生入口就绪及 TDB-ready 通知完成。
+4. **检查就绪阶段**：确认类型注册记录、原生入口就绪及 CI 初始化 通知完成。
 5. **检查实际行为**：检查实例创建、方法返回、字段变化、业务调用及退出清理。
 
 常见日志含义：
@@ -659,9 +672,10 @@ SetPair(System.Int32, System.Object)
 | `Plugin declarations skipped` | 当前文件的声明解析失败，查看相邻错误原因 |
 | `function missing` / `function version mismatch` | TOML 的 binding 与 DLL 登记不一致 |
 | `Plugin skipped` | 该 provider 被跳过，依赖它的新类型也可能受影响 |
+| `SDK ABI identity missing` / `SDK ABI mismatch` | DLL 缺少版本导出或 ABI 不匹配；核宿主与该实例全部 provider 的配套版本 |
 | `Startup window missed` | 当前运行时未赶上启动注册窗口，检查安装版本及加载方式 |
 | `Published metadata` / `Registered` | 已推进到类型发布/注册阶段，仍需确认入口就绪 |
-| `TDB-ready notifications complete; injection ready=1` | CI 已完成注册及就绪通知，可继续排查具体业务或资源加载 |
+| `CI provider initialization complete; injection ready=1` | CI 已完成注册及就绪通知，可继续排查具体业务或资源加载 |
 
 单份 provider 绑定缺失或版本错配时，其整份声明会被跳过；依赖其中自定义类型的 provider 也会被跳过。按日志先解决上游声明或绑定错误，再检查依赖扩展。
 
@@ -683,11 +697,11 @@ SetPair(System.Int32, System.Object)
 
 ### 它和 REFramework 是什么关系？
 
-CI 同时提供早期插件 loader 和类型扩展；REFramework 提供脚本、反射访问及插件能力。普通 RF 插件进入依赖 SDK/TDB 的业务阶段时，部分初始化可能已经结束；CI 提供更早的 TDB-ready 接入点，让插件赶在后续关键初始化之前准备逻辑。它不要求先使用新类型，也不提前初始化 RF SDK。使用 Lua 验证或 SDK 字段接口时，仍需要相应 REFramework 环境。
+CI 同时提供早期插件 loader 和类型扩展；REFramework 提供脚本、反射访问及插件能力。普通 RF 插件进入依赖 SDK/TDB 的业务阶段时，部分初始化可能已经结束；CI 提供更早的 CI 初始化 接入点，让插件赶在后续关键初始化之前准备逻辑。它不要求先使用新类型，也不提前初始化 RF SDK。使用 Lua 验证或 SDK 字段接口时，仍需要相应 REFramework 环境。
 
 ### 不新增 class，也能使用 CI 吗？
 
-可以。提供同名 TOML、固定登记入口和 `ci_on_tdb_ready`，即可将 CI 用作早期 loader，具体见第 10.2 节。早期查询与接入准备使用 ProviderContext。
+可以。提供同名 TOML、固定登记入口和 `ci_on_initialize`，即可将 CI 用作早期 loader，具体见第 10.2 节。早期查询与接入准备使用 ProviderContext。
 
 ### “接近 Unity 的创作体验”具体指什么？
 

@@ -1,13 +1,14 @@
-#include "ClassProvider.h"
+#include <ci/Provider.hpp>
 #include <reframework/API.hpp>
 
 using ManagedObject = reframework::API::ManagedObject;
-using FnObjectCtor = void (*)(void*, ManagedObject*);
+using FnObjectCtor = void (*)(void* vmContext, ManagedObject* object);
 static FnObjectCtor ObjectCtor{};
 
 // 父构造由插件选择；CI 只保存完整构造函数的原生入口。
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
-    ObjectCtor = reinterpret_cast<FnObjectCtor>(context->GetMethod(context->GetType("System.Object"), ".ctor()"));
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
+    ObjectCtor = reinterpret_cast<FnObjectCtor>(context->sdk->method->get_function(
+        context->sdk->type_definition->find_method(context->sdk->tdb->find_type("System.Object"), ".ctor()")));
 }
 
 // 由调用方在 SDK 就绪后调用标准 RF 入口；早期类型描述不访问 SDK。
@@ -38,11 +39,11 @@ void SetCounter(void* vmctx, ManagedObject* self, int32_t value) noexcept {
 }
 
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction("BaseCtor", &BaseCtor, 1)
-        .RegisterFunction("DerivedCtor", &DerivedCtor, 1)
-        .RegisterFunction("Add", &Add, 1)
-        .RegisterFunction("BaseEvaluate", &BaseEvaluate, 1)
-        .RegisterFunction("DerivedEvaluate", &DerivedEvaluate, 1)
-        .RegisterFunction("Sum", &Sum, 2)
-        .RegisterFunction("SetCounter", &SetCounter, 1);
+    registration.register_func("BaseCtor", &BaseCtor, 1)
+        .register_func("DerivedCtor", &DerivedCtor, 1)
+        .register_func("Add", &Add, 1)
+        .register_func("BaseEvaluate", &BaseEvaluate, 1)
+        .register_func("DerivedEvaluate", &DerivedEvaluate, 1)
+        .register_func("Sum", &Sum, 2)
+        .register_func("SetCounter", &SetCounter, 1);
 }

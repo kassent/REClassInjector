@@ -1,6 +1,6 @@
 # ClassInjector Developer Guide
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [Public SDK header](include/ClassProvider.h)
+[English](README.md) | [简体中文](README.zh-CN.md) | [Provider SDK](include/ci/Provider.hpp)
 [Build from source / 从源码构建](BUILDING.md)
 
 **Integrate earlier in game initialization, and give your mod its own components, data, and native behavior.**
@@ -22,7 +22,7 @@ Supported environment: **Monster Hunter Wilds, Windows x64, TDB81**.
 - [7. Fields, References, and Resources](#7-fields-references-and-resources)
 - [8. Extending Existing Types and Enums](#8-extending-existing-types-and-enums)
 - [9. Generics and Arrays](#9-generics-and-arrays)
-- [10. Initialization and the ProviderContext API](#10-initialization-and-the-providercontext-api)
+- [10. Initialization and the Provider SDK API](#10-initialization-and-the-provider-sdk-api)
 - [11. Compatibility, Troubleshooting, and Distribution](#11-compatibility-troubleshooting-and-distribution)
 - [12. Frequently Asked Questions](#12-frequently-asked-questions)
 
@@ -42,7 +42,7 @@ A hook installed at that point may affect only **future calls**, not the first i
 
 ### 1.2 CI Is Also an Earlier Plugin Loader
 
-CI does more than add classes. It loads participating provider DLLs early and exposes `ci_on_tdb_ready`, a callback for **integrating with subsequent initialization as soon as the type system is available**.
+CI does more than add classes. It loads participating provider DLLs early and exposes `ci_on_initialize`, a callback for **integrating with subsequent initialization as soon as the type system is available**.
 
 This notification occurs **after TDB types and native method entries are ready, but before global static constructors execute**. A plugin can look up the types and methods it needs, prepare its integration, and install hooks that must take effect before initialization, then let the engine continue normally.
 
@@ -56,9 +56,10 @@ Engine startup
   |
   +-- The engine builds the TDB and prepares types and native method entries
   |    |
-  |    +-- CI: ci_on_tdb_ready(context)
-  |         Plugins look up entries and prepare integration
-  |         before subsequent initialization executes
+  |    +-- CI: every provider's ci_on_initialize(context)
+  |    |    Query entries, prepare integration, submit TDB-dependent JSON to UDE
+  |    +-- CI: every provider's ci_on_post_initialize(context)
+  |         UDE closes registration, validates declarations, installs its decode hook
   |
   +-- Global static constructors and other initialization continue
   |   Type lists, static tables, and caches are built by their systems
@@ -156,7 +157,7 @@ These capabilities improve both integration timing and feature organization. Aut
 
 | Capability | What it enables | Conditions or limits |
 |---|---|---|
-| Early plugin loading and notification | Integrate after TDB/native entries are ready and before subsequent critical initialization | Use CI's paired loading and `ci_on_tdb_ready`; the RF SDK is not necessarily ready |
+| Early plugin loading and notification | Integrate after TDB/native entries are ready and before subsequent critical initialization | Use CI's paired loading and `ci_on_initialize`; the RF SDK is not necessarily ready |
 | New managed classes | Independent data objects, parameter types, and behavior implementations | The base type and actual call path must be compatible |
 | Fields | Scalars, managed references, and embedded existing ValueTypes | This does not include arbitrary new struct definitions |
 | Methods and constructors | Instance methods, constructor overloads, virtual methods, overrides, and abstract methods | Implementations use C++ bindings and must match engine calling conventions |
@@ -236,10 +237,11 @@ Two different names appear here:
 
 ### 4.2 Implement the Provider Method
 
-Use the public `ClassProvider.h` header supplied with the developer interface. This example uses only ProviderContext and has no REFramework SDK dependency:
+Use the public `ci/Provider.hpp` header supplied with the developer interface. This example uses only ProviderContext and has no REFramework SDK dependency:
 
 ```cpp
-#include <ClassProvider.h>
+#include <ci/Provider.hpp>
+#include <ci/API.hpp>
 #include <cstdint>
 #include <cstdio>
 
@@ -250,7 +252,7 @@ namespace Example::Counter {
     static int32_t Add(void* vmctx, void* self, int32_t delta) noexcept {
         (void)vmctx;
         auto* value = g_context
-            ? g_context->GetField<int32_t>(self, "Value")
+            ? ci::API::ManagedObject{g_context->sdk, self}.get_field<int32_t>("Value")
             : nullptr;
         if (!value) {
             std::fputs("CounterPlugin: Value field unavailable\n", stderr);
@@ -262,9 +264,8 @@ namespace Example::Counter {
 }
 
 extern "C" __declspec(dllexport)
-void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
-    if (!context || !context->GetType || !context->GetFieldLayout ||
-        !context->GetInstanceType || !context->GetRawField) {
+void ci_on_initialize(const ci::ProviderContext* context) noexcept {
+    if (!context || !context->sdk || !context->sdk->managed_object || !context->sdk->field) {
         std::fputs("CounterPlugin: required ProviderContext service unavailable\n", stderr);
         return;
     }
@@ -273,7 +274,7 @@ void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
 
 // Use this macro in exactly one .cpp file per provider DLL.
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction(
+    registration.register_func(
         "Example.Counter.Add(System.Int32)", &Example::Counter::Add, 1);
 }
 ```
@@ -368,10 +369,12 @@ A concrete class must implement any remaining abstract methods in its inheritanc
 
 ### 5.4 Parameters and Native Signatures
 
-A typical instance method has this form:
+The full native signature of Counter.Add from Section 4 is:
 
 ```cpp
-ReturnType Method(void* vmctx, void* self, ExplicitArgs...) noexcept;
+#include <cstdint>
+
+int32_t Add(void* vmContext, void* self, int32_t delta) noexcept;
 ```
 
 An SDK-based implementation may declare `self` using the corresponding managed-object pointer type. It does not point to an ordinary C++ business object. Managed declarations are not inferred automatically from the C++ function pointer.
@@ -394,7 +397,7 @@ Look up the method as `TryGetValue(System.Int32)`, without appending `&` to the 
 
 ### 5.5 Binding Versions
 
-The numeric `binding.version` must exactly match the version in `.RegisterFunction(..., version)`. It is a **per-method contract version**, not the TOML format version or the DLL's overall version.
+The numeric `binding.version` must exactly match the version in `.register_func(..., version)`. It is a **per-method contract version**, not the TOML format version or the DLL's overall version.
 
 When changing parameters, return types, or calling contracts, update the declaration, implementation, and version together, and check that the C++ signature corresponds to the managed declaration.
 
@@ -435,14 +438,14 @@ A custom `app.AppBehavior` can add fields and override the lifecycle methods abo
 ProviderContext field access returns the address of a field slot:
 
 ```cpp
-auto* value = context->GetField<int32_t>(object, "Value"); // int32_t*
-auto** peer = context->GetField<void*>(object, "Peer");  // void**
+auto* value = ci::API::ManagedObject{context->sdk, object}.get_field<int32_t>("Value"); // int32_t*
+auto** peer = ci::API::ManagedObject{context->sdk, object}.get_field<void*>("Peer");  // void**
 ```
 
 The caller must supply the correct template argument; field types are not checked automatically. Confirm the field contract before reading or writing. A field address is valid only while its owning object remains valid.
 
 - Write POD scalar values through slots of the correct type.
-- Update managed-reference fields using `AssignReference(owner, field, value)` rather than bypassing reference management with a raw assignment.
+- Update managed-reference fields using `ci::API{*context->sdk}.objects().assign_reference(owner, field, value)` rather than a raw assignment. The field is a reference slot (`void**`); check the returned success flag.
 - To keep an object across callbacks, retain and release it according to the contract of the API that supplied it. A raw pointer or a local Lua/C++ variable is not permanent ownership.
 - Before releasing externally held references, make sure the relevant callbacks have stopped using the object, then release according to the acquisition contract.
 
@@ -450,7 +453,7 @@ The caller must supply the correct template argument; field types are not checke
 
 Fields can use ValueTypes already present in the TDB, such as `via.vec3` and `System.Guid`. These fields contain embedded payloads, not pointers to boxed objects.
 
-For whole-value copies, use the actual payload length and the appropriate field-writing mechanism. `GetValueTypeSize` returns the payload size of a closed value type, or 0 for non-value types and types without a layout. A wrapper object's size differs from the embedded payload size. Structs containing managed references also require the corresponding reference-management contract.
+For whole-value copies, use the actual payload length and the appropriate field-writing mechanism. `get_valuetype_size` returns the payload size of a closed value type, or 0 for non-value types and types without a layout. A wrapper object's size differs from the embedded payload size. Structs containing managed references also require the corresponding reference-management contract.
 
 ### 7.3 Resource Serialization Fields
 
@@ -516,7 +519,7 @@ appends = [{ name = "Example_ExtraDay", value = 7 }]
 - Appended members use `name` and an Int32 `value`. Duplicate names are errors; existing members are not overwritten.
 - An alias with the same value does not replace the original canonical name. Value-to-name lookup still returns the first matching member.
 - Within one declaration, renames are applied before appends. Fully restart after changes.
-- Dynamic registration is also available through `registration.ExtendEnum(...)` inside `CI_REGISTER_PROVIDER`.
+- Dynamic registration is also available through `registration.register_enum(...)` inside `CI_REGISTER_PROVIDER`.
 
 When appending an ID used by game logic, also supply the corresponding entries in tables, resources, or factories that consume it.
 
@@ -539,104 +542,112 @@ When a field or method uses `Example.Counter[]`, CI automatically supplies the m
 
 New array types are limited to one-dimensional class-reference arrays. New value-type arrays, multidimensional arrays, jagged arrays, array covariance, and complete generic array interfaces are outside the supported scope. ProviderContext's `CreateArray` can allocate instances of value-array types already present in the engine.
 
-## 10. Initialization and the ProviderContext API
+## 10. Initialization and the Provider SDK API
 
-### 10.1 Three Stages of Plugin Loading and Integration
+### 10.1 Public Headers, Registration, and Versions
 
-| Stage | What the provider should do | What is not guaranteed |
-|---|---|---|
-| Early loading and function registration | CI loads the provider; register addresses, versions, and required enum extensions | VM, game-system singletons, and the REFramework SDK being ready |
-| `ci_on_tdb_ready` | Before global static constructors run, query types/methods/fields, prepare initialization integration, save ProviderContext, and check required services | All static game objects being constructed, or an automatically established managed-call scope |
-| Normal game-system lifecycle | Use objects and resources in the appropriate native call chain | Arbitrary threads, IPC calls, or frame callbacks being interchangeable with the required lifecycle |
+| Header | Purpose |
+|---|---|
+| `ci/Provider.h` | POD protocol for `ProviderContext`, `RegistrationAPI`, and enum registration |
+| `ci/Provider.hpp` | DLL-local `Registration`, `EnumChanges`, and `CI_REGISTER_PROVIDER` |
+| `ci/API.h` | Six `SDKAPI` tables and opaque handles |
+| `ci/API.hpp` | DLL-local `ci::API` value views and vector helpers |
 
-`ci_on_tdb_ready(const ci::ProviderContext*) noexcept` is an optional export. Each valid provider receives one notification when ready. ProviderContext and its type/field descriptions are borrowed data owned by the runtime; callers do not free them.
+Use `CI_REGISTER_PROVIDER(registration)` once, in one `.cpp` per provider DLL. It generates the `ci_get_sdk_abi` and `ci_register_provider` C exports. `RegistrationAPI` and `Registration` are call-local; do not retain them for initialization callbacks. The host copies inputs synchronously, and accumulated registration errors make the export return failure.
 
-For features that depend on first-time initialization, perform the required entry lookup and integration setup at this stage, rather than waiting for ordinary plugin initialization or the first frame callback. Operations that require an existing scene, player, or game-system singleton should wait for that object's actual lifecycle.
-
-**TDB readiness and REFramework SDK readiness are separate.** A ProviderContext-only provider does not need to initialize the SDK to look up types. A DLL using the REFramework C++ API must complete its own standard initialization; CI does not forward that initialization.
-
-### 10.2 Using CI Only as an Early Loader
-
-A plugin that adds no types can still participate in CI loading through a matching TOML file. Place `EarlyPlugin.dll` and `EarlyPlugin.toml` together in `reframework/plugins/`. The TOML file can serve only as the loading marker:
-
-```toml
-# EarlyPlugin.toml: participate in early loading without declaring types or enums.
-schema_version = 1
-```
-
-The DLL still needs the fixed registration entry point, even when it has no implementation functions to register. It then receives ProviderContext through the optional readiness callback:
+This is a **C++ alternative** to the TOML enum example in Section 8.2. Do not register both copies of the same changes:
 
 ```cpp
-#include <ClassProvider.h>
-#include <cstdio>
+#include <ci/Provider.hpp>
 
 CI_REGISTER_PROVIDER(registration) {
-    (void)registration; // Loader-only example; no new type methods to register.
-}
-
-extern "C" __declspec(dllexport)
-void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
-    const auto* type = context->GetType("System.Object");
-    const auto constructor = type ? context->GetMethod(type, ".ctor()") : nullptr;
-    if (!constructor) {
-        std::fputs("EarlyPlugin: required method unavailable\n", stderr);
-        return;
-    }
-    std::fputs("EarlyPlugin: TDB entry available before static initialization\n", stderr);
-    // Look up this plugin's required entries and prepare initialization integration here.
-    // This example only queries a method; it does not create objects, call constructors,
-    // or depend on the RF SDK.
+    registration.register_enum("System.DayOfWeek", {
+        .renames = {
+            ci::EnumRename::by_name("Tuesday", "Example_Tuesday"),
+            ci::EnumRename::by_value(4, "Example_Thursday")
+        },
+        .additions = {{"Example_ExtraDay", 7}}
+    });
 }
 ```
 
-This example writes messages to standard error. Your project can use its own logging facilities to capture them. Put the plugin's method lookups and initialization integration in `ci_on_tdb_ready`, and record failure reasons. `DllMain`, static global object construction, and function registration should perform only preparation that does not depend on the VM/SDK.
+Omit unused `renames` or `additions` instead of passing empty positional lists. `EnumChanges` is a local argument, not an initializer_list or STL object to retain across DLLs. Register functions as in Section 4: `registration.register_func("full binding key", &implementation, version)`.
 
-When a provider also uses REFramework features, CI handles early loading and readiness notification, while standard REFramework plugin initialization prepares SDK-dependent functionality. Organize the same module's initialization around these two stages.
+The current SDK ABI is **3**. `ProviderContext` contains only `const ci::SDKAPI* sdk`. SDK ABI, TOML `schema_version`, and each function's `binding.version` are independent versions. ABI1/2 are incompatible with this host; rebuild the host and every provider installed in that instance together. The public-header and snake_case reorganization preserves ABI3 layouts.
 
-### 10.3 Common Services at a Glance
-
-The following summarizes semantics. See the matching `ClassProvider.h` for exact parameter types.
-
-| API | Purpose and important contract |
-|---|---|
-| `GetType` | Look up a type by fully qualified name; returns null if absent |
-| `GetMethod` | Look up a method entry by name/signature, including base types; does not perform object virtual dispatch |
-| `GetFieldLayout` | Return a read-only field layout, not the field value |
-| `GetInstanceType` | Obtain the type of a valid managed instance |
-| `GetRawField` | Obtain a raw instance field address from a `FieldLayout`; also used for service availability checks |
-| `GetField<T>` | Obtain a field-slot address; the caller must supply the correct `T` |
-| `IsDerivedFrom` | Check type equality or the base-class chain; not interface compatibility |
-| `IsEnum` | Identify a concrete enum type; excludes `System.Enum` itself |
-| `GetValueTypeSize` | Query the payload size of an existing closed value type |
-| `CreateInstance` | Allocate an object; does not implicitly invoke `.ctor` or add a retain |
-| `CreateArray` | Allocate a managed array; fill it before its first retain/publication |
-| `CreateString` | Create a string from NUL-terminated UTF-8; does not add a retain |
-| `CreateAction` | Create an Action delegate for a compatible method; does not add a retain or define a new delegate type |
-| `Retain` / `Release` | Use according to the ownership contract of the API that supplied the object; requires a non-null object |
-| `AssignReference` | Update a managed-reference field correctly; check the success result |
-| `CreateUserData` | Request USER data; returns one owned reference to release, without guaranteeing decoding is complete |
-| `CreateResourceHolder` | Request a resource and create its holder; does not add a retain to the managed holder |
-| `DeserializeRsz` | Invoke the RSZ reader with the public input/output container; preserves native status, and output roots hold one reference |
-
-An unavailable optional service has a null function pointer. Check required entries before enabling a feature, and report missing services clearly. Use the `ClassProvider.h` supplied for the runtime release.
-
-### 10.4 Method Lookup Syntax
-
-Use complete signatures to avoid overload ambiguity:
+### 10.2 Two Initialization Phases and Zero-Type Providers
 
 ```text
-Add(System.Int32)
-SetPair(System.Int32, System.Object)
-.ctor()
+Scan matching TOML/DLL pairs, check ci_get_sdk_abi, call ci_register_provider
+  → Register functions/enums and validate bindings (no VM or RF SDK access)
+  → Publish types; prepare native entries, custom vtables, and ProviderContext
+  → Every provider's ci_on_initialize
+       Query metadata, prepare early integration, submit TDB-dependent JSON to UDE
+  → Every provider's ci_on_post_initialize
+       UDE closes registration, validates declarations, installs its decode hook
+  → Continue the game's global static constructors
 ```
 
-Names are case-sensitive. Separate parameters with a comma followed by one space. Omit return types, parameter names, and implicit `vmctx/self`; omit `&` when querying `ref/out` parameters. A bare method name selects the first matching declaration, so avoid relying on overload ordering.
+Both rounds run **before global static constructors**. They are not adjacent notifications for each individual provider. They do not depend on manifest filenames or provide a general dependency graph. Submit to UDE from the first round (`ci_on_initialize`), not from your own second-round callback.
 
-### 10.5 Managed-Call Scopes and Object Ownership
+Either notification export may be omitted; a post-only provider such as UDE still receives its callback. The signatures are:
 
-`vmctx` must come from the actual native calling lifecycle. Obtaining a thread context, switching to the main thread, or scheduling work in `UpdateBehavior` does not by itself establish an outer managed-call scope. ProviderContext does not establish that scope on the caller's behalf.
+```cpp
+extern "C" __declspec(dllexport)
+void ci_on_initialize(const ci::ProviderContext* context) noexcept;
 
-Use the appropriate native lifecycle when creating objects, delegates, or components, or triggering more complex engine operations. `forceHeapAllocation = true` affects allocation location only: it does not invoke constructors, retain objects, or establish a managed-call scope. With temporary allocations, complete initialization and transfer references to a field, event, or other owner within the valid scope rather than keeping a raw pointer after it expires.
+extern "C" __declspec(dllexport)
+void ci_on_post_initialize(const ci::ProviderContext* context) noexcept;
+```
+
+To use CI only as an early loader, install an empty same-basename TOML (comments are also fine), supply this no-op registration body, and implement a notification as needed:
+
+```cpp
+#include <ci/Provider.hpp>
+
+CI_REGISTER_PROVIDER(registration) {
+    // Zero-type provider; no VM or RF SDK access here.
+}
+```
+
+Early notification is not RF plugin initialization or readiness of game singletons, caches, or resources. The context/SDK tables are borrowed for the host lifetime, unlike the call-local `RegistrationAPI`.
+
+### 10.3 Queries, Fields, and Ownership
+
+Public queries do not require RF initialization. This function checks metadata and an entry only; it does not create business objects or invoke constructors during early notification:
+
+```cpp
+#include <ci/Provider.hpp>
+#include <ci/API.hpp>
+
+static bool HasObjectConstructor(const ci::ProviderContext& context) {
+    const ci::API api{*context.sdk};
+    const auto type = api.tdb().find_type("System.Object");
+    if (!type)
+        return false;
+    const auto method = type.find_method(".ctor()");
+    if (!method)
+        return false;
+    using FnConstructor = void (*)(void* vmContext, void* object);
+    return method.get_function<FnConstructor>() != nullptr;
+}
+```
+
+| Group | POD tables / C++ views | Contract |
+|---|---|---|
+| Metadata | `tdb`, `type_definition`, `field`, `method` / `api.tdb()` and type/field/method views | `find_method` returns metadata; `get_function<exact signature>()` obtains its native entry |
+| Objects | `managed_object` / `api.objects()` | `create_instance` neither invokes .ctor nor retains; manage caller ownership with `retain/release`; write reference slots with `assign_reference` |
+| Resources | `resource_manager` / `api.resources()` | `create_userdata` returns one owned reference, not necessarily decoded; holder finalizers own their native requests |
+
+- `Field::get_data<T>()` returns **`T&`**; `ManagedObject::get_field<T>()` returns **`T*`**. The caller checks the actual field type.
+- Address instance fields through the actual object; use `get_data_raw(payload, true)` for unboxed embedded payloads. Field views copy by value, but addresses remain tied to object lifetime. There is no public `FieldLayout` or UDE global field-layout cache.
+- `get_init_data()` returns borrowed metadata initializer bytes, or `nullptr` when absent. It is not runtime static storage or present on every field. For enum constants, check literal status, type, and width before reading; zero is not an absent initializer.
+- Raw `get_fields/get_methods` `out_size` is in **bytes**; `out_count` counts written handles. `ci::Result` follows REF's integer convention (`ERROR_NONE == 0`). C++ wrappers allocate DLL-local vectors; no custom visitor is needed.
+- `create_action(vmContext, actionType, target, method)` takes a real Method handle, not a C++ function address or a manually replaced delegate slot.
+- No API establishes a managed VM scope. Create objects and execute methods within real native lifecycles; a main thread, VM context, bare IPC, or `UpdateBehavior` is not proof of an outer scope. Initialize reference-array elements before first publication to an owner.
+- Unresolved optional entries may be null; check services actually required. Successful queries do not imply business, resource, or RF SDK readiness.
+
+Method lookup still uses complete signatures, comma spacing, parent lookup, and ref/out element-type rules; it does not perform automatic virtual dispatch or construction. See the [provider header](include/ci/Provider.hpp), [SDK views](include/ci/API.hpp), [ABI tables](include/ci/API.h), and [UDE submission example](https://github.com/kassent/UserDataExtension/blob/main/README.md#10-plugin-developer-api).
 
 ## 11. Compatibility, Troubleshooting, and Distribution
 
@@ -653,7 +664,7 @@ Use the appropriate native lifecycle when creating objects, delegates, or compon
 1. **Check file pairing:** verify that matching TOML/DLL files are directly in `reframework/plugins/`, not a subdirectory.
 2. **Check startup logs:** runtime logs are written to `logs/HIDWrapper.log`. With a mod manager, locate them according to its file-redirection settings. Use logs from the current launch.
 3. **Check declarations and bindings:** look for TOML errors, missing functions, version mismatches, and failed dependencies.
-4. **Check readiness:** confirm type registration records, native entry readiness, and completion of TDB-ready notifications.
+4. **Check readiness:** confirm type registration records, native entry readiness, and completion of CI initialization notifications.
 5. **Check behavior:** inspect instance creation, method returns, field changes, game-system calls, and cleanup on exit.
 
 Common log messages:
@@ -664,9 +675,10 @@ Common log messages:
 | `Plugin declarations skipped` | Declaration parsing failed for that file; inspect the accompanying error |
 | `function missing` / `function version mismatch` | TOML bindings disagree with DLL registrations |
 | `Plugin skipped` | The provider was skipped; types depending on it may also be affected |
+| `SDK ABI identity missing` / `SDK ABI mismatch` | Missing version export or mismatched ABI; check the host and every provider in this instance |
 | `Startup window missed` | The runtime missed the startup registration window; check the installed version and loading arrangement |
 | `Published metadata` / `Registered` | Type publication/registration has progressed; also confirm entry readiness |
-| `TDB-ready notifications complete; injection ready=1` | CI completed registration and readiness notification; continue with feature-specific or resource-loading diagnostics |
+| `CI provider initialization complete; injection ready=1` | CI completed registration and readiness notification; continue with feature-specific or resource-loading diagnostics |
 
 If a provider has a missing binding or version mismatch, all declarations from that provider are skipped. Providers depending on its custom types are skipped as well. Resolve upstream declaration or binding errors first, then check dependent extensions.
 
@@ -688,11 +700,11 @@ The runtime is a shared dependency. When uninstalling one extension, remove only
 
 ### How Does CI Relate to REFramework?
 
-CI provides early plugin loading and type extension. REFramework provides scripting, reflection access, and plugin capabilities. Some initialization may already be complete when ordinary RF plugins reach their SDK/TDB-dependent stage. CI's earlier TDB-ready callback lets plugins prepare integration before subsequent critical initialization. It does not require new types and does not initialize the RF SDK earlier. Lua examples and SDK-based field access still require the appropriate REFramework environment.
+CI provides early plugin loading and type extension. REFramework provides scripting, reflection access, and plugin capabilities. Some initialization may already be complete when ordinary RF plugins reach their SDK/TDB-dependent stage. CI's early initialization callback lets plugins prepare integration before subsequent critical initialization. It does not require new types and does not initialize the RF SDK earlier. Lua examples and SDK-based field access still require the appropriate REFramework environment.
 
 ### Can I Use CI Without Adding a Class?
 
-Yes. Supply a matching TOML file, the fixed registration entry point, and `ci_on_tdb_ready` to use CI as an early loader; see Section 10.2. Use ProviderContext for early lookups and integration setup.
+Yes. Supply a matching TOML file, the fixed registration entry point, and `ci_on_initialize` to use CI as an early loader; see Section 10.2. Use ProviderContext for early lookups and integration setup.
 
 ### What Does an Authoring Experience Closer to Unity Mean?
 
@@ -708,7 +720,7 @@ TOML describes contracts, not method bodies. Declarations can bind to existing C
 
 ### Why Does a Type Exist but Produce No Visible Effect?
 
-Check whether the object is created through the correct path, its constructor executes, it is connected to the intended game-system registry, resources reference the correct type, and the lifecycle actually invokes its methods. ProviderRegistration is the first step.
+Check whether the object is created through the correct path, its constructor executes, it is connected to the intended game-system registry, resources reference the correct type, and the lifecycle actually invokes its methods. Registration is the first step.
 
 ### Are New Fields Saved Automatically?
 

@@ -21,7 +21,7 @@ namespace ci {
                                          std::to_string(GetLastError()) + ")");
             }
             // 不把 API 表交给未知 SDK 布局；DllMain 已由 Windows 执行，这不是模块沙箱。
-            const auto getSdkAbi = reinterpret_cast<FnGetSdkAbi>(GetProcAddress(module, "ci_get_sdk_abi"));
+            const auto getSdkAbi = reinterpret_cast<FnGetSDKABI>(GetProcAddress(module, "ci_get_sdk_abi"));
             if (!getSdkAbi) {
                 throw std::runtime_error("SDK ABI identity missing; expected=" + std::to_string(SDK_ABI_VERSION));
             }
@@ -30,9 +30,9 @@ namespace ci {
                 throw std::runtime_error("SDK ABI mismatch: expected=" + std::to_string(SDK_ABI_VERSION) +
                                          " actual=" + std::to_string(providerAbi));
             }
-            auto registerFunctions =
+            auto registerProvider =
                 reinterpret_cast<FnRegisterProvider>(GetProcAddress(module, "ci_register_provider"));
-            if (!registerFunctions) {
+            if (!registerProvider) {
                 throw std::runtime_error("ci_register_provider entry is missing");
             }
             struct Function {
@@ -47,45 +47,55 @@ namespace ci {
                 Functions functions;
                 std::vector<CustomTypeConfig> enumExtensions;
             } state{.providerSource = providerSource};
-            const ProviderRegistrationApi api{
+
+            const RegistrationAPI api{
                 .context = &state,
-                .AddFunction = [](void* context, const char* name, void* address, uint32_t version) {
-                    auto& functions = static_cast<RegistrationState*>(context)->functions;
-                    if (!name || !*name || !address || !functions.emplace(name, Function{address, version}).second) {
-                        _MESSAGE("Invalid/duplicate function registration: %s", name ? name : "<null>");
-                        return false;
-                    }
-                    return true;
-                },
-                .AddEnumExtension = [](void* context, const char* name, const EnumRename* renames, size_t renameCount, const EnumAppend* appends, size_t appendCount) {
-                    if (!name || !*name || (!renameCount && !appendCount) || (renameCount && !renames) || (appendCount && !appends)) return false;
-                    CustomTypeConfig type{.name = name, .enumExtension = EnumExtensionSpec{}};
-                    for (size_t i = 0; i < renameCount; ++i) {
-                        if (!renames[i].to || !*renames[i].to) return false;
-                        EnumRenameSpec rename{.to = renames[i].to};
-                        switch (renames[i].source) {
-                        case EnumRenameSource::Name:
-                            if (!renames[i].fromName || !*renames[i].fromName) return false;
-                            rename.source = renames[i].fromName;
-                            break;
-                        case EnumRenameSource::Value:
-                            rename.source = renames[i].fromValue;
-                            break;
-                        default:
+                .register_func =
+                    [](void* context, const char* name, void* address, uint32_t version) {
+                        auto& functions = static_cast<RegistrationState*>(context)->functions;
+                        if (!name || !*name || !address ||
+                            !functions.emplace(name, Function{address, version}).second) {
+                            _MESSAGE("Invalid/duplicate function registration: %s", name ? name : "<null>");
                             return false;
                         }
-                        type.enumExtension->renames.push_back(std::move(rename));
-                    }
-                    for (size_t i = 0; i < appendCount; ++i) {
-                        if (!appends[i].name || !*appends[i].name) return false;
-                        type.enumExtension->appends.push_back({.name = appends[i].name, .value = appends[i].value});
-                    }
-                    auto& state = *static_cast<RegistrationState*>(context);
-                    type.providerSource = state.providerSource;
-                    state.enumExtensions.push_back(std::move(type));
-                    return true;
-                }};
-            if (!registerFunctions(&api)) {
+                        return true;
+                    },
+                .register_enum =
+                    [](void* context, const char* name, const EnumRename* renames, size_t renameCount,
+                       const EnumMember* appends, size_t appendCount) {
+                        if (!name || !*name || (!renameCount && !appendCount) || (renameCount && !renames) ||
+                            (appendCount && !appends))
+                            return false;
+                        CustomTypeConfig type{.name = name, .enumExtension = EnumExtensionSpec{}};
+                        for (size_t i = 0; i < renameCount; ++i) {
+                            if (!renames[i].to_name || !*renames[i].to_name)
+                                return false;
+                            EnumRenameSpec rename{.to = renames[i].to_name};
+                            switch (renames[i].kind) {
+                            case EnumMatchKind::Name:
+                                if (!renames[i].from_name || !*renames[i].from_name)
+                                    return false;
+                                rename.source = renames[i].from_name;
+                                break;
+                            case EnumMatchKind::Value:
+                                rename.source = renames[i].from_value;
+                                break;
+                            default:
+                                return false;
+                            }
+                            type.enumExtension->renames.push_back(std::move(rename));
+                        }
+                        for (size_t i = 0; i < appendCount; ++i) {
+                            if (!appends[i].name || !*appends[i].name)
+                                return false;
+                            type.enumExtension->appends.push_back({.name = appends[i].name, .value = appends[i].value});
+                        }
+                        auto& state = *static_cast<RegistrationState*>(context);
+                        type.providerSource = state.providerSource;
+                        state.enumExtensions.push_back(std::move(type));
+                        return true;
+                    }};
+            if (!registerProvider(&api)) {
                 throw std::runtime_error("DLL registration failed");
             }
             for (auto& type : config.types) {
@@ -108,7 +118,10 @@ namespace ci {
             }
             config.types.insert(config.types.end(), std::make_move_iterator(state.enumExtensions.begin()), std::make_move_iterator(state.enumExtensions.end()));
             if (notification) {
-                *notification = {reinterpret_cast<FnTdbReady>(GetProcAddress(module, "ci_on_tdb_ready")), providerSource};
+                *notification = {
+                    reinterpret_cast<FnInitializationCallback>(GetProcAddress(module, "ci_on_initialize")),
+                    providerSource,
+                    reinterpret_cast<FnInitializationCallback>(GetProcAddress(module, "ci_on_post_initialize"))};
             }
             return true;
         } catch (const std::exception& error) {
@@ -219,7 +232,7 @@ namespace ci {
                 result.insert(result.end(), std::make_move_iterator(provider.config.types.begin()),
                               std::make_move_iterator(provider.config.types.end()));
                 // 在整份校验和依赖剔除完成后保留通知；加载过但被拒绝的 DLL 不收到回调。
-                if (callbacks && provider.notification.callback) {
+                if (callbacks && (provider.notification.initialize || provider.notification.postInitialize)) {
                     callbacks->push_back(std::move(provider.notification));
                 }
             }
@@ -267,7 +280,12 @@ namespace ci {
             if (notification.providerSource) {
                 _MESSAGE("Notifying provider: %s [%s]", notification.providerSource->configPath.c_str(), notification.providerSource->dllPath.c_str());
             }
-            notification.callback(&context);
+            if (notification.initialize)
+                notification.initialize(&context);
+        }
+        for (const auto& notification : pending) {
+            if (notification.postInitialize)
+                notification.postInitialize(&context);
         }
     }
 } // namespace ci

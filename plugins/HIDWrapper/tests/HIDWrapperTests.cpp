@@ -84,7 +84,9 @@ int wmain(int argc, wchar_t** argv) {
         const auto trigger = log.find("CreateWindowEx from EXE:");
         Check(trigger != std::string::npos && log.find("CreateWindowEx from EXE:", trigger + 1) == std::string::npos, "A/W share one startup trigger");
         Check(log.find("ClassInjector startup:") != std::string::npos, "integrated CI core was called directly");
-        Check(log.find("Type injection skipped: no valid type declarations or TDB-ready providers") != std::string::npos, "empty provider directories do not patch an unrelated EXE");
+        Check(log.find("Type injection skipped: no valid type declarations or "
+                       "CI initialization providers") != std::string::npos,
+              "empty provider directories do not patch an unrelated EXE");
         Check(GetModuleHandleW(L"ClassInjector.dll") == nullptr, "initialization did not load the retired host");
         std::cout << "PASS: 47 HID names/ordinals, System32 forwarding, " << unavailableExports << " unsupported exports checked, direct CI initialization once across W/A, no standalone host or production RF exports\n";
         return 0;

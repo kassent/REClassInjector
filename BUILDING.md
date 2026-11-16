@@ -27,7 +27,7 @@ git submodule update --init --recursive
 ```powershell
 cmake -S . -B build -A x64 `
   "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
-  -DVCPKG_HIDWrapper_TRIPLET=x64-windows-static
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static
 cmake --build build --config Release --target HIDWrapper
 cmake --build build --config Release --target check
 ```
@@ -40,12 +40,14 @@ cmake --build build --config Release --target check
 
 ```text
 common/                         WildsCommonLib submodule
-include/ClassProvider.h          convenient public SDK entry
+include/ci/                     convenient public Provider/API headers
 plugins/ClassInjector/           core, SDK, examples and offline fixtures
 plugins/HIDWrapper/              integrated hid.dll startup entry
 ```
 
-The deliverable is the integrated `hid.dll`, not a standalone `ClassInjector.dll`. `include/ClassProvider.h` and `plugins/ClassInjector/include/ClassProvider.h` are identical SDK copies for existing links and build layout. The offline suite includes synthetic metadata, field layout, enums, provider ABI rejection, HID forwarding and common contracts. Captured game snapshots and live-game resource fixtures are not distributed.
+The deliverable is the integrated `hid.dll`, not a standalone `ClassInjector.dll`. `include/ci/` and `plugins/ClassInjector/include/ci/` contain identical `Provider.h`, `Provider.hpp`, `API.h` and `API.hpp` copies; use `#include <ci/Provider.hpp>` and `#include <ci/API.hpp>`. The old `ClassProvider.h` is removed, with no compatibility wrapper. The SDK ABI is 3: update the host and all installed providers together. The eight offline tests cover synthetic metadata/fields/enums, ABI1/2 and missing/mismatched identity rejection, SDK initializers/buffers/two-phase callbacks, HID forwarding and common contracts. Captured game snapshots and live-game resource fixtures are not distributed.
+
+公共 SDK 使用 `ci/` 分层头和 snake_case 的 `register_func/register_enum`；ABI3 不与旧 ABI1/2 混用。`check` 包含新增 SDK 测试及仅后置通知 provider，不只验证主 DLL 能编译。
 
 运行产物为集成宿主 `hid.dll`；示例、诊断与测试 Provider 为显式构建目标，不随生产构建自动部署。
 

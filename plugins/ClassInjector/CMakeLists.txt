@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(tomlplusplus)
 add_library(ClassInjectorCore STATIC EXCLUDE_FROM_ALL
     src/ProviderConfig.cpp src/ClassProviders.cpp src/TypeDatabaseBuilder.cpp src/ClassFields.cpp src/ClassMethods.cpp src/GenericTypes.cpp src/EnumMembers.cpp
     src/MethodTrampolines.cpp src/InvokeAdapters.cpp src/ClassVirtualTable.cpp
-    src/TypeDatabase.cpp src/ClassProviderContext.cpp src/TypeInjection.cpp)
+    src/TypeDatabase.cpp src/ProviderMetadataAPI.cpp src/ProviderObjectAPI.cpp src/ProviderResourceAPI.cpp src/ClassProviderContext.cpp src/TypeInjection.cpp)
 target_include_directories(ClassInjectorCore PUBLIC include PRIVATE src)
 target_link_libraries(ClassInjectorCore PUBLIC common_lib PRIVATE tomlplusplus::tomlplusplus)
 target_compile_definitions(ClassInjectorCore PRIVATE NOMINMAX)
@@ -159,3 +159,25 @@ target_link_libraries(ClassInjectorSignatureTests PRIVATE common_lib)
 target_compile_options(ClassInjectorSignatureTests PRIVATE /utf-8)
 target_compile_definitions(ClassInjectorSignatureTests PRIVATE NOMINMAX CI_INVOKE_SIGNATURE_PROVIDER)
 CopyCIManifest(ClassInjectorSignatureTests tests/InvokeSignatureTypes.toml invoke-signatures)
+
+add_executable(ClassInjectorProviderSDKTests EXCLUDE_FROM_ALL tests/ProviderSDKTests.cpp)
+target_include_directories(ClassInjectorProviderSDKTests PRIVATE include src)
+target_compile_definitions(ClassInjectorProviderSDKTests PRIVATE NOMINMAX)
+target_compile_options(ClassInjectorProviderSDKTests PRIVATE /utf-8)
+target_link_libraries(ClassInjectorProviderSDKTests PRIVATE ClassInjectorCore)
+
+add_library(ClassInjectorFinalPhaseProvider SHARED EXCLUDE_FROM_ALL tests/FinalPhaseProvider.cpp)
+target_include_directories(ClassInjectorFinalPhaseProvider PRIVATE include)
+target_compile_options(ClassInjectorFinalPhaseProvider PRIVATE /utf-8)
+add_dependencies(ClassInjectorProviderSDKTests ClassInjectorFinalPhaseProvider)
+
+add_library(ClassInjectorAbiOneProvider SHARED EXCLUDE_FROM_ALL tests/IncompatibleProvider.cpp)
+target_include_directories(ClassInjectorAbiOneProvider PRIVATE include)
+target_compile_definitions(ClassInjectorAbiOneProvider PRIVATE CI_TEST_ABI_ONE)
+target_compile_options(ClassInjectorAbiOneProvider PRIVATE /utf-8)
+
+add_library(ClassInjectorAbiTwoProvider SHARED EXCLUDE_FROM_ALL tests/IncompatibleProvider.cpp)
+target_include_directories(ClassInjectorAbiTwoProvider PRIVATE include)
+target_compile_definitions(ClassInjectorAbiTwoProvider PRIVATE CI_TEST_ABI_TWO)
+target_compile_options(ClassInjectorAbiTwoProvider PRIVATE /utf-8)
+add_dependencies(ClassInjectorProviderAbiTests ClassInjectorAbiOneProvider ClassInjectorAbiTwoProvider)

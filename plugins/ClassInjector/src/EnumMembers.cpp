@@ -17,19 +17,9 @@ namespace ci {
 
     // initData 项是有符号池偏移而非枚举值；只在按值选源时读取，纯按名路径不依赖该表。
     static int32_t ReadEnumConstant(const TypeDatabase& database, const FieldDef& field) {
-        const auto& original = database.header;
-        const auto& impl = database.fieldImpls[field.impl];
-        const auto index = (field.initHi << 10) | (impl.initMid << 6) | impl.initLo;
-        if (!original.initData || original.numInitData <= 0 || index >= uint32_t(original.numInitData)) {
-            throw std::runtime_error("enum value selection requires captured initializer data");
-        }
-        const auto offset = int64_t(static_cast<const int32_t*>(original.initData)[index]);
-        const auto position = size_t(offset < 0 ? -offset : offset);
-        const auto size = offset < 0 ? database.strings.size() : database.bytes.size();
-        if (!offset || position > size || size - position < sizeof(int32_t)) {
-            throw std::runtime_error("enum constant pool offset is missing or out of bounds");
-        }
-        const void* data = offset < 0 ? static_cast<const void*>(database.strings.data() + position) : database.bytes.data() + position;
+        const void* data = database.GetFieldInitializer(field);
+        if (!data)
+            throw std::runtime_error("enum initializer is missing or out of bounds");
         int32_t value;
         std::memcpy(&value, data, sizeof(value));
         return value;

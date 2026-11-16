@@ -1,13 +1,13 @@
-#include <ClassProvider.h>
 #include <GameTypes.h>
 #include <HookUtils.h>
 #include <LogUtils.h>
-#include <lua.hpp>
-#include <sol/sol.hpp>
-#include <nlohmann/json.hpp>
 #include <array>
 #include <atomic>
+#include <ci/Provider.hpp>
+#include <lua.hpp>
 #include <mutex>
+#include <nlohmann/json.hpp>
+#include <sol/sol.hpp>
 #include <stdexcept>
 
 // 独立能力探针：只修改System.DayOfWeek；原生PlayerManager回调中单次执行反射，业务敌人不参与。
@@ -110,19 +110,18 @@ static bool InstallProbe() {
 // 动态声明与TOML声明走同一枚举构建路径，顺便验证provider登记阶段。
 CI_REGISTER_PROVIDER(registration) {
     std::string sunday = "CI_SundayByCpp";
-    registration.ExtendEnum("System.DayOfWeek", {
-        ci::EnumRename::FromName("CI_Thursday", "CI_ThursdayByName"),
-        ci::EnumRename::FromValue(2, "CI_TuesdayByValue"),
-        ci::EnumRename::FromValue(0, sunday.c_str()),
-        ci::EnumRename::FromName("CI_NegativeByValue", "CI_NegativeByName")
-    }, {{.name = "CI_FromProvider", .value = 987654321}});
+    registration.register_enum(
+        "System.DayOfWeek",
+        {.renames = {ci::EnumRename::by_name("CI_Thursday", "CI_ThursdayByName"),
+                     ci::EnumRename::by_value(2, "CI_TuesdayByValue"), ci::EnumRename::by_value(0, sunday.c_str()),
+                     ci::EnumRename::by_name("CI_NegativeByValue", "CI_NegativeByName")},
+         .additions = {{.name = "CI_FromProvider", .value = 987654321}}});
     sunday.assign("provider-local string changed after registration"); // 核宿主在登记调用内复制字符串。
-    registration.ExtendEnum("System.DayOfWeek", {
-        ci::EnumRename::FromValue(987654321, "CI_FromProviderByValue"),
-        ci::EnumRename::FromName("CI_SundayByCpp", "CI_Sunday"),
-        ci::EnumRename::FromValue(INT32_MIN, "CI_MinByValue"),
-        ci::EnumRename::FromValue(INT32_MAX, "CI_MaxByValue")
-    }, {});
+    registration.register_enum("System.DayOfWeek",
+                               {.renames = {ci::EnumRename::by_value(987654321, "CI_FromProviderByValue"),
+                                            ci::EnumRename::by_name("CI_SundayByCpp", "CI_Sunday"),
+                                            ci::EnumRename::by_value(INT32_MIN, "CI_MinByValue"),
+                                            ci::EnumRename::by_value(INT32_MAX, "CI_MaxByValue")}});
 }
 extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFrameworkPluginVersion* version) {
     *version = {.major = REFRAMEWORK_PLUGIN_VERSION_MAJOR, .minor = REFRAMEWORK_PLUGIN_VERSION_MINOR, .patch = REFRAMEWORK_PLUGIN_VERSION_PATCH};

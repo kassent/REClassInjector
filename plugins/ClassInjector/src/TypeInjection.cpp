@@ -26,7 +26,7 @@ namespace ci {
     // 原名称搜索仍使用扩表前的数量；近址存储使原 RIP-relative 指令可直接引用它。
     static uint32_t* g_originalTypeCountStorage{};
     static std::vector<CustomTypeConfig> g_declarations;
-    static std::vector<ClassProviderNotification> g_tdbReadyCallbacks;
+    static std::vector<ClassProviderNotification> g_providerCallbacks;
 
     using FnBuildRuntimeTables = uint32_t (*)(RE::VM*, RE::TDB*);
     using FnInitializeRuntimeEntries = void (*)();
@@ -182,7 +182,7 @@ namespace ci {
         _MESSAGE("Runtime entries ready; notifying providers=%zu", callbacks.size());
         g_ready.store(true, std::memory_order_release);
         NotifyClassProviders(callbacks, GetContext());
-        _MESSAGE("TDB-ready notifications complete; injection ready=1");
+        _MESSAGE("CI provider initialization complete; injection ready=1");
         return true;
     }
 
@@ -205,7 +205,7 @@ namespace ci {
         static auto beforeStaticConstructorsHook = safetyhook::create_mid(
             reinterpret_cast<void*>(staticConstructorLoop + 7), [](SafetyHookContext&) {
                 _MESSAGE("Native entries registered; notifying providers before native static constructors");
-                CompleteRuntimeInitialization(g_tdbReadyCallbacks);
+                CompleteRuntimeInitialization(g_providerCallbacks);
             });
         if (!beforeStaticConstructorsHook) {
             _MESSAGE("Native initialization hook FAILED: pre-cctor entry-ready midhook");
@@ -227,7 +227,7 @@ namespace ci {
             _MESSAGE("Native entry initialization entered (caller CALL bridge; native body unchanged)");
             g_initializeRuntimeEntriesOriginal();
             _MESSAGE("Native entry initialization returned");
-            CompleteRuntimeInitialization(g_tdbReadyCallbacks);
+            CompleteRuntimeInitialization(g_providerCallbacks);
         });
         return g_initializeRuntimeEntriesOriginal == initializeRuntimeEntries;
     }
@@ -245,10 +245,12 @@ namespace ci {
             _MESSAGE("ClassInjector startup: pid=%lu", GetCurrentProcessId());
             // 核对一对一的 TOML / DLL 和整份函数版本；失效插件不会进入 metadata 构建。
             // 独立类型 provider 与兼任 RF 插件的 provider 一起核对，依赖可跨目录引用。
-            g_declarations = LoadClassProviders({gameDirectory / L"plugins", gameDirectory / L"reframework/plugins"}, &g_tdbReadyCallbacks);
+            g_declarations = LoadClassProviders({gameDirectory / L"plugins", gameDirectory / L"reframework/plugins"},
+                                                &g_providerCallbacks);
             // 只提供 ProviderContext 回调的插件同样需要经过完整的原生 TDB 初始化流程。
-            if (g_declarations.empty() && g_tdbReadyCallbacks.empty()) {
-                _MESSAGE("Type injection skipped: no valid type declarations or TDB-ready providers in plugins or reframework/plugins");
+            if (g_declarations.empty() && g_providerCallbacks.empty()) {
+                _MESSAGE("Type injection skipped: no valid type declarations or CI initialization providers in plugins "
+                         "or reframework/plugins");
                 return false;
             }
             // 1. 找到首次 builder 调用和 VM 全局槽位，并确认尚未错过 VM 初始化窗口。
@@ -364,8 +366,8 @@ namespace ci {
                     return result;
                 }
                 *g_originalTypeCountStorage = tdb->numTypes;
-                if (g_declarations.empty() && g_tdbReadyCallbacks.empty()) {
-                    _MESSAGE("Metadata injection skipped: no type declarations or TDB-ready providers loaded");
+                if (g_declarations.empty() && g_providerCallbacks.empty()) {
+                    _MESSAGE("Metadata injection skipped: no type declarations or CI initialization providers loaded");
                     return result;
                 }
                 BuildAndPublishTypeDatabase(*tdb, *g_initializingVm, methodAddressBase,

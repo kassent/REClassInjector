@@ -1,6 +1,7 @@
-#include <ClassProvider.h>
 #include <GameTypes.h>
 #include <LogUtils.h>
+#include <ci/API.hpp>
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <reframework/API.hpp>
 #include <sol/sol.hpp>
@@ -20,12 +21,14 @@ namespace ClassInjectorDiagnostics {
     static uint64_t InvokeScalarMethod(API::Method* method, void* entry, uintptr_t self, uintptr_t first, uintptr_t second) {
         const auto* resultType = method->get_return_type();
         const auto resultName = resultType->get_full_name();
-        const auto size = context->GetValueTypeSize(reinterpret_cast<const ci::Type*>(resultType));
+        const auto size =
+            context->sdk->type_definition->get_valuetype_size(reinterpret_cast<ci::TypeDefinitionHandle>(resultType));
         if (method->get_num_params() > 2 || resultName == "System.Single" || resultName == "System.Double" ||
             (size && size != 1 && size != 2 && size != 4 && size != 8)) {
             throw std::runtime_error("use SDK invoke for floating-point/aggregate signatures or more than two arguments");
         }
-        using FnInvokeScalarMethod = uint64_t (*)(void*, void*, uintptr_t, uintptr_t);
+        using FnInvokeScalarMethod =
+            uint64_t (*)(void* vmContext, void* object, uintptr_t firstValue, uintptr_t secondValue);
         const auto value = reinterpret_cast<FnInvokeScalarMethod>(entry)(API::get()->get_vm_context(), reinterpret_cast<void*>(self), first, second);
         if (resultName == "System.Void") {
             return 0;
@@ -40,7 +43,7 @@ namespace ClassInjectorDiagnostics {
     static void InitializeDiagnostics(lua_State* state) {
         API::LuaLock lock;
         if (!context) {
-            _MESSAGE("Diagnostics unavailable: TDB-ready ProviderContext was not received");
+            _MESSAGE("Diagnostics unavailable: CI initialization ProviderContext was not received");
             return;
         }
         sol::state_view lua{state};
@@ -48,8 +51,9 @@ namespace ClassInjectorDiagnostics {
         diagnostics["ready"] = [] { return context != nullptr; };
         diagnostics["set_reference"] = [](uintptr_t self, const std::string& name, uintptr_t value) {
             auto* owner = reinterpret_cast<void*>(self);
-            auto** field = context->GetField<void*>(owner, name.c_str());
-            return field && context->AssignReference && context->AssignReference(owner, field, reinterpret_cast<void*>(value));
+            auto** field = ci::API::ManagedObject{context->sdk, owner}.get_field<void*>(name.c_str());
+            return field && context->sdk->managed_object->assign_reference &&
+                   context->sdk->managed_object->assign_reference(owner, field, reinterpret_cast<void*>(value));
         };
         diagnostics["virtual_index"] = [](const std::string& declaringType, const std::string& name) {
             const auto* method = FindMethod(declaringType, name);
@@ -65,12 +69,15 @@ namespace ClassInjectorDiagnostics {
             auto** slots = static_cast<void**>(info[-2]);
             return InvokeScalarMethod(method, slots[slot], address, first.value_or(0), second.value_or(0));
         };
-        diagnostics["call_interface"] = [](uintptr_t address, const std::string& interfaceName, const std::string& name, sol::optional<uintptr_t> first, sol::optional<uintptr_t> second) {
-            const auto* type = context->GetType(interfaceName.c_str());
+        diagnostics["call_interface"] = [](uintptr_t address, const std::string& interfaceName, const std::string& name,
+                                           sol::optional<uintptr_t> first, sol::optional<uintptr_t> second) {
+            const auto* type =
+                reinterpret_cast<const RE::RETypeDefinition*>(context->sdk->tdb->find_type(interfaceName.c_str()));
             if (!type || !(type->typeFlags & 0x20)) {
                 throw std::runtime_error("interface type not found: " + interfaceName);
             }
-            const auto* source = context->GetInstanceType(reinterpret_cast<void*>(address));
+            const auto* source = reinterpret_cast<const RE::RETypeDefinition*>(
+                context->sdk->managed_object->get_type_definition(reinterpret_cast<void*>(address)));
             if (!source || !source->getInterfaceListOffset()) {
                 throw std::runtime_error("object does not implement " + interfaceName);
             }
@@ -103,7 +110,10 @@ namespace ClassInjectorDiagnostics {
 
 // 空声明清单只用于取得生产 ProviderContext；本模块不新增类型、不安装启动 hook。
 CI_REGISTER_PROVIDER(registration) {}
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept { ClassInjectorDiagnostics::context = context; }
+
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
+    ClassInjectorDiagnostics::context = context;
+}
 
 extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFrameworkPluginVersion* version) {
     *version = {.major = REFRAMEWORK_PLUGIN_VERSION_MAJOR,

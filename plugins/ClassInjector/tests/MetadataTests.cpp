@@ -1,24 +1,27 @@
-#include "TypeDatabaseBuilder.h"
+#include "ProviderTestAccess.h"
+using namespace CIProviderTestAccess;
 #include "ClassInjectorTestAccess.h"
-#include "CustomTypeBuildSpec.h"
-#include "TypeInjection.h"
+#include "ClassMethods.h"
 #include "ClassProviderContext.h"
-#include "MethodTrampolines.h"
 #include "ClassProviders.h"
 #include "ClassVirtualTable.h"
-#include "ClassMethods.h"
+#include "CustomTypeBuildSpec.h"
+#include "MethodTrampolines.h"
 #include "NativeCallProbe.h"
-#include <HookUtils.h>
+#include "ProviderMetadataAPI.h"
+#include "TypeDatabaseBuilder.h"
+#include "TypeInjection.h"
 #include <BranchTrampoline.h>
+#include <HookUtils.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
-#include <iostream>
-#include <stdexcept>
 #include <fstream>
-#include <tuple>
-#include <thread>
+#include <iostream>
 #include <sstream>
+#include <stdexcept>
+#include <thread>
+#include <tuple>
 
 void TestInvokeSignatures(const RE::TDB& header);
 
@@ -85,12 +88,16 @@ namespace {
         static const REFrameworkPluginInitializeParam parameter{.sdk = &sdk};
         return &parameter;
     }
-    void InitializeTestProvider(HMODULE module, bool notify = true) {
-        auto initialize =
+
+    void InitializeTestProvider(HMODULE module, bool runProviderInitialization = true) {
+        const auto initializeREFramework =
             reinterpret_cast<REFPluginInitializeFn>(GetProcAddress(module, "reframework_plugin_initialize"));
-        Check(initialize && initialize(GetMockSdk()), "test provider SDK initialization");
-        auto ready = reinterpret_cast<ci::FnTdbReady>(GetProcAddress(module, "ci_on_tdb_ready"));
-        if (ready && notify) ready(&ci::GetContext());
+        Check(initializeREFramework && initializeREFramework(GetMockSdk()), "test provider SDK initialization");
+        const auto initializeProvider =
+            reinterpret_cast<ci::FnInitializationCallback>(GetProcAddress(module, "ci_on_initialize"));
+        if (initializeProvider && runProviderInitialization) {
+            initializeProvider(&ci::GetContext());
+        }
     }
     template <class F> void Rejects(F&& function) {
         bool rejected = false;
@@ -507,7 +514,7 @@ namespace {
         ci::CustomTypeConfig derived{.name = "Tests.EmbeddedReferences", .base = base.name,
                             .fields = {{"Payload", "Tests.ReferencePayload"}, {"Tail", "System.Object"}}};
         auto database = ci::BuildTypeDatabase(fixture.header, {base, derived});
-        const auto* type = database->GetType(derived.name);
+        const auto* type = QueryType(database, derived.name);
         const auto* field = database->GetFieldDef(type, "Payload");
         const auto* tail = database->GetFieldDef(type, "Tail");
         const auto& impl = database->typeImpls[type->implIndex];
@@ -547,7 +554,9 @@ namespace {
 
     static void TestMethodCodeOwnership() {
         Fixture fixture;
-        auto value = +[](void*, void*) -> int32_t { return 42; };
+        auto value = +[](void* vmContext, void* object) -> int32_t {
+            return 42;
+        };
         ci::CustomTypeConfig declaration{
             .name = "Tests.OwnedEntries",
             .methods = {{.name = "First", .returnType = "System.Int32",
@@ -684,7 +693,7 @@ namespace {
         std::vector<ci::ClassProviderNotification> callbacks{{[](const ci::ProviderContext* context) noexcept {
             ++calls;
             observedReady = ci::g_ready.load();
-            observedConstructor = context->GetMethod(context->GetType("System.Object"), ".ctor()");
+            observedConstructor = QueryMethod(context, QueryType(context, "System.Object"), ".ctor()");
         }}};
         Check(!ci::FinalizeRuntimeTypes() && !ci::CompleteRuntimeInitialization(callbacks) &&
                   callbacks.size() == 1 && !calls && !ci::g_ready,
@@ -725,8 +734,8 @@ base = "System.Object"
                   callbacks.size() == 1 && database.extensions.capacity() == 0,
               "builder completion releases extension checks without publishing ready or notifying providers");
         auto& context = ci::GetContext();
-        auto* type = context.GetType("System.Object");
-        Check(!context.GetMethod(type, ".ctor()") && database.methodQueries[type].at(".ctor()"),
+        auto* type = QueryType(context, "System.Object");
+        Check(!QueryMethod(context, type, ".ctor()") && database.methodQueries[type].at(".ctor()"),
               "pending entry caches its declaration rather than a permanent null declaration");
 
         // 模拟外层原生注册：更新同一 MethodDef 及父类虚表；不重新建表或清空查询缓存。
@@ -749,7 +758,7 @@ base = "System.Object"
     // 先于 API::initialize 运行，确保 ProviderContext 查询没有借用 RF SDK 的隐式初始化。
     void TestQueries() {
         auto& context = ci::GetContext();
-        Check(!context.GetType("System.Object") && !context.GetMethod(nullptr, "recipe()"),
+        Check(!QueryType(context, "System.Object") && !QueryMethod(context, nullptr, "recipe()"),
               "queries before metadata return null");
         Fixture fixture;
         fixture.types[fixture.object].memberMethodIndex = 1;
@@ -797,32 +806,36 @@ binding = {function = "QueryProbe", version = 1}
         for (auto& method : database.customMethods) {
             database.methods[method.index].encodedOffset = int32_t(0x100 + method.index * 16);
         }
-        auto* original = context.GetType("System.Object");
-        auto* base = context.GetType("Tests.QueryBase");
-        auto* derived = context.GetType("Tests.QueryDerived");
+        auto* original = QueryType(context, "System.Object");
+        auto* base = QueryType(context, "Tests.QueryBase");
+        auto* derived = QueryType(context, "Tests.QueryDerived");
         Check(original == &database.types[fixture.object] && base && derived, "original/custom type handles");
-        Check(!context.GetType(" Tests.QueryBase ") && !context.GetType("tests.QueryBase") &&
-                  !context.GetType("Tests.Missing"), "type names match RF exactly");
-        auto* pick = context.GetMethod(base, "Pick()");
-        auto* pickOne = context.GetMethod(base, "Pick(System.Int32)");
+        Check(!QueryType(context, " Tests.QueryBase ") && !QueryType(context, "tests.QueryBase") &&
+                  !QueryType(context, "Tests.Missing"),
+              "type names match RF exactly");
+        auto* pick = QueryMethod(context, base, "Pick()");
+        auto* pickOne = QueryMethod(context, base, "Pick(System.Int32)");
         Check(pick && pickOne && pick != pickOne, "exact overload signatures");
-        Check(context.GetMethod(base, "Pick") == pick && context.GetMethod(derived, "Pick()") == pick,
+        Check(QueryMethod(context, base, "Pick") == pick && QueryMethod(context, derived, "Pick()") == pick,
               "bare name takes first overload and full signature searches parents");
-        Check(context.GetMethod(derived, "Pick") == context.GetMethod(derived, "Pick(System.Int32)") &&
-                  context.GetMethod(derived, "Pick") != pickOne, "bare lookup prefers current declaring type");
-        Check(context.GetMethod(base, "Pick(System.Int32, System.Int32)") &&
-                  !context.GetMethod(base, "Pick(System.Int32,System.Int32)") &&
-                  !context.GetMethod(base, " Pick( System.Int32 ) "), "RF comma-space and exact whitespace matching");
-        Check(context.GetMethod(derived, "Evaluate()") != context.GetMethod(base, "Evaluate()"),
+        Check(QueryMethod(context, derived, "Pick") == QueryMethod(context, derived, "Pick(System.Int32)") &&
+                  QueryMethod(context, derived, "Pick") != pickOne,
+              "bare lookup prefers current declaring type");
+        Check(QueryMethod(context, base, "Pick(System.Int32, System.Int32)") &&
+                  !QueryMethod(context, base, "Pick(System.Int32,System.Int32)") &&
+                  !QueryMethod(context, base, " Pick( System.Int32 ) "),
+              "RF comma-space and exact whitespace matching");
+        Check(QueryMethod(context, derived, "Evaluate()") != QueryMethod(context, base, "Evaluate()"),
               "nearest override declaration");
         const auto* overrideMethod = database.GetMethodDef(derived, "Evaluate()");
         database.methods[overrideMethod - database.methods.data()].encodedOffset = 0;
-        Check(!context.GetMethod(derived, "Evaluate()"), "abstract/missing override does not fall back to parent");
-        Check(!context.GetMethod(base, "Missing") && !context.GetMethod(base, "Pick(System.Int32,System.Int32)") &&
-                  !context.GetMethod(base, "") && !context.GetMethod(base, "Pick("),
+        Check(!QueryMethod(context, derived, "Evaluate()"), "abstract/missing override does not fall back to parent");
+        Check(!QueryMethod(context, base, "Missing") &&
+                  !QueryMethod(context, base, "Pick(System.Int32,System.Int32)") && !QueryMethod(context, base, "") &&
+                  !QueryMethod(context, base, "Pick("),
               "missing/malformed queries return null");
         auto cacheCount = database.methodQueries[base].size();
-        Check(context.GetMethod(base, "Pick") == pick && !context.GetMethod(base, "Missing") &&
+        Check(QueryMethod(context, base, "Pick") == pick && !QueryMethod(context, base, "Missing") &&
                   database.methodQueries[base].size() == cacheCount && !database.methodQueries[base].at("Missing"),
               "successful and missing declarations are cached");
         std::atomic_bool parallelOk{true};
@@ -830,7 +843,7 @@ binding = {function = "QueryProbe", version = 1}
         for (auto& thread : threads) {
             thread = std::thread([&] {
                 for (int i = 0; i < 1000; ++i) {
-                    if (context.GetMethod(base, "Pick") != pick || context.GetMethod(base, "Missing")) {
+                    if (QueryMethod(context, base, "Pick") != pick || QueryMethod(context, base, "Missing")) {
                         parallelOk = false;
                     }
                 }
@@ -841,8 +854,7 @@ binding = {function = "QueryProbe", version = 1}
         }
         Check(parallelOk, "parallel RF-style cache queries");
         auto originalEntry = reinterpret_cast<void*>(database.encodingBase + 123);
-        Check(context.GetMethod(derived, "recipe(System.Int32)") == originalEntry,
-              "inherited original AOT method");
+        Check(QueryMethod(context, derived, "recipe(System.Int32)") == originalEntry, "inherited original AOT method");
         // 原参数 ID 高位带编码标志，发布后总数可能跨越 bitmask 边界。
         for (uint32_t i = 1; i < database.originalMethodCount; ++i) {
             auto* list = reinterpret_cast<ci::ParamList*>(database.bytes.data() + database.methods[i].GetParameterOffset());
@@ -853,19 +865,21 @@ binding = {function = "QueryProbe", version = 1}
         }
         database.parameters.resize((database.originalParameterMask + 1) * 2);
         database.Publish(fixture.header);
-        Check(context.GetMethod(original, "recipe(System.Int32)") == originalEntry,
+        Check(QueryMethod(context, original, "recipe(System.Int32)") == originalEntry,
               "original parameter mask remains fixed after publish");
         const auto* method = database.GetMethodDef(base, "Pick(System.Int32)");
         auto* list = reinterpret_cast<ci::ParamList*>(database.bytes.data() + method->GetParameterOffset());
         auto id = *reinterpret_cast<uint32_t*>(list + 1);
         database.parameters[id].modifier = 2;
-        Check(context.GetMethod(base, "Pick(System.Int32)") == pickOne &&
-                  !context.GetMethod(base, "Pick(System.Int32&)"), "RF out lookup uses the element type without ampersand");
+        Check(QueryMethod(context, base, "Pick(System.Int32)") == pickOne &&
+                  !QueryMethod(context, base, "Pick(System.Int32&)"),
+              "RF out lookup uses the element type without ampersand");
         database.parameters[id].modifier = 1;
-        Check(context.GetMethod(base, "Pick(System.Int32)") == pickOne &&
-                  !context.GetMethod(base, "Pick(System.Int32*)"), "RF pointer lookup also uses the element type");
+        Check(QueryMethod(context, base, "Pick(System.Int32)") == pickOne &&
+                  !QueryMethod(context, base, "Pick(System.Int32*)"),
+              "RF pointer lookup also uses the element type");
         database.methods[method - database.methods.data()].encodedOffset = 0;
-        Check(!context.GetMethod(base, "Pick(System.Int32)"), "cached declaration reads its current entry");
+        Check(!QueryMethod(context, base, "Pick(System.Int32)"), "cached declaration reads its current entry");
         static int calls;
         static const ci::ProviderContext* received;
         std::vector<ci::ClassProviderNotification> callbacks{{[](const ci::ProviderContext* value) noexcept {
@@ -874,7 +888,7 @@ binding = {function = "QueryProbe", version = 1}
         }}};
         ci::NotifyClassProviders(callbacks, ci::GetContext());
         ci::NotifyClassProviders(callbacks, ci::GetContext());
-        Check(calls == 1 && received == &context && received->GetType("Tests.QueryBase") == base,
+        Check(calls == 1 && received == &context && QueryType(received, "Tests.QueryBase") == base,
               "stable context and one-shot notification");
         ci::g_database.reset();
         Fixture genericFixture;
@@ -895,8 +909,9 @@ binding = {function = "QueryProbe", version = 1}
         genericRegistry->encodingBase = 0x10000000;
         auto* genericType = &genericRegistry->types[genericFixture.object];
         auto expected = reinterpret_cast<void*>(genericRegistry->encodingBase + 124);
-        Check(genericRegistry->GetMethod(genericType, "recipe") == expected &&
-                  genericRegistry->GetMethod(genericType, "recipe()") == expected, "RF skips generic definitions in both passes");
+        Check(QueryMethod(genericRegistry, genericType, "recipe") == expected &&
+                  QueryMethod(genericRegistry, genericType, "recipe()") == expected,
+              "RF skips generic definitions in both passes");
         std::cout << "PASS: early queries before RF SDK, RF bare/full signatures, first overload, inheritance, exact "
                      "whitespace, modifier semantics, generic skip, positive/negative cache, parallel queries, "
                      "published parameter mask, live entry and one-shot context\n";
@@ -1249,7 +1264,8 @@ binding = { function = "MutatePosition", version = 1 }
             Position value;
             uint32_t after;
         } buffer{0xCCCCCCCC, {1, 2, 3}, 0xCCCCCCCC};
-        using FnMutate = void (*)(void*, void*, Position*, void*, void*);
+
+        using FnMutate = void (*)(void* vmContext, void* object, Position* position, void* work, void* operatorWork);
         auto slot = database->methodImpls[database->methods[method.index].impl].virtualIndex;
         auto& derived = database->customTypes[1];
         auto* override = database->FindMethod(derived.virtualMethods[slot]);
@@ -1353,8 +1369,9 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
             Position value;
             uint32_t after;
         } buffer{0xCCCCCCCC, {7, 8, 9}, 0xCCCCCCCC};
-        auto* query = database->GetMethod(
-            database->GetType("Tests.ExportRef"),
+
+        auto* query = QueryMethod(
+            database, QueryType(database, "Tests.ExportRef"),
             "updateTableInpl(ace.btable.BTableDef.POSITION, ace.btable.cCommandWork, ace.btable.cOperatorWork)");
         Check(query == method.entry, "RF-style three-parameter ref query returns registered entry");
         reinterpret_cast<void (*)(void*, void*, Position*, void*, void*)>(query)(
@@ -1656,7 +1673,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
             auto* descriptor = reinterpret_cast<const uint32_t*>(database.bytes.data() + metadata.genericsOffset);
             Check(type->genericDefinition == definition && descriptor[0] == (definition | (1u << 19)) &&
                       !(metadata.typeFlags & 0x08000000) && database.GetFullName(type->index) == type->name &&
-                      database.GetType(type->name) == &metadata,
+                      QueryType(database, type->name) == &metadata,
                   "closed type identity/full name/query");
         }
         auto* field = database.GetFieldDef(&database.types[value->index], "_TimerType");
@@ -1685,10 +1702,10 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         uint64_t vmctx{};
         auto ctor = database.FindMethod(uint32_t(database.types[derived->index].defaultCtorIndex));
         reinterpret_cast<void (*)(void*, void*)>(ctor->entry)(&vmctx, &self);
-        auto getter = database.GetMethod(&database.types[derived->index], "get_TimerType()");
-        auto setter = database.GetMethod(&database.types[derived->index], "set_TimerType(System.DayOfWeek)");
+        auto getter = QueryMethod(database, &database.types[derived->index], "get_TimerType()");
+        auto setter = QueryMethod(database, &database.types[derived->index], "set_TimerType(System.DayOfWeek)");
         Check(getter && setter, "inherited enum method signatures");
-        auto start = database.GetMethod(&database.types[derived->index], "start(via.behaviortree.ActionArg)");
+        auto start = QueryMethod(database, &database.types[derived->index], "start(via.behaviortree.ActionArg)");
         auto implementation = std::ranges::find_if(database.customMethods, [&](auto& m) { return m.entry == start; });
         Check(implementation != database.customMethods.end(), "closed parent override found");
         const auto slot = database.methodImpls[database.methods[implementation->index].impl].virtualIndex;
@@ -1985,7 +2002,7 @@ renames=[{fromName='Second',to='Third'}]
             "schema_version=1\n[[types]]\nname='Tests.Names.Accepted'\n"
             "fields=[{name='<Count>k__BackingField',type='System.Int32'}]", "author-names.toml");
         auto database = ci::BuildTypeDatabase(fixture.header, std::move(declarations));
-        const auto* type = database->GetType("Tests.Names.Accepted");
+        const auto* type = QueryType(database, "Tests.Names.Accepted");
         Check(type && database->GetFullName(uint32_t(type->index)) == "Tests.Names.Accepted" &&
                   database->GetFieldDef(type, "<Count>k__BackingField") && database->GetMethodDef(type, ".ctor()"),
               "qualified names, backing fields and constructor punctuation remain valid");
@@ -2364,7 +2381,7 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         static void* receivedContext;
         static void* receivedSelf;
         parentCalls = 0;
-        using FnCtor = void (*)(void*, void*);
+        using FnCtor = void (*)(void* vmContext, void* object);
         static const FnCtor parentCtor = [](void* vmctx, void* self) {
             ++parentCalls;
             receivedContext = vmctx;
@@ -2391,28 +2408,30 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         database.encodingBase = uintptr_t(parentCtor) - 0x1000;
         ci::CreateMethodTrampolines(database);
         ci::PrepareInvokeAdapters(database);
-        const auto* type = database.GetType("Tests.Parameterized");
-        const auto* only = database.GetType("Tests.ParameterizedOnly");
+        const auto* type = QueryType(database, "Tests.Parameterized");
+        const auto* only = QueryType(database, "Tests.ParameterizedOnly");
         Check(type && only && type->defaultCtorIndex && !only->defaultCtorIndex, "only parameterless ctor becomes the default");
         const auto signature = ".ctor(System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32)";
-        auto* entry = database.GetMethod(type, signature);
+        auto* entry = QueryMethod(database, type, signature);
         const auto* code = static_cast<const uint8_t*>(entry);
         Check(code && code[0] == 0xFF && code[1] == 0x25, "constructor entry is an ordinary native tail jump");
-        Check(database.GetMethod(only, signature) && !database.GetMethod(only, ".ctor()"), "constructors are not inherited during query");
+        Check(QueryMethod(database, only, signature) && !QueryMethod(database, only, ".ctor()"),
+              "constructors are not inherited during query");
         const auto* method = database.GetMethodDef(type, signature);
         const auto* list = reinterpret_cast<const ci::ParamList*>(database.bytes.data() + method->GetParameterOffset());
         Check(list->count == 6 && list->invokeId == expectedInvoke, "constructor selects its six-parameter invoke recipe, not Object.ctor");
         std::array<int32_t, 8> values{};
         values.fill(int32_t(0xCCCCCCCC));
         uint64_t contextMarker{};
-        using FnSixCtor = void (*)(void*, void*, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
+        using FnSixCtor = void (*)(void* vmContext, void* object, int32_t firstValue, int32_t secondValue,
+                                   int32_t thirdValue, int32_t fourthValue, int32_t fifthValue, int32_t sixthValue);
         reinterpret_cast<FnSixCtor>(entry)(&contextMarker, values.data(), 7, -11, 13, -17, 19, -23);
         Check(parentCalls == 1 && receivedContext == &contextMarker && receivedSelf == values.data(), "provider alone controls parent construction and receives original ctx/self");
         Check(values == std::array<int32_t, 8>{7, -11, 13, -17, 19, -23, int32_t(0xCCCCCCCC), int32_t(0xCCCCCCCC)}, "all register/stack parameters preserved without host clearing");
         auto reversed = specs;
         std::ranges::reverse(reversed[1].methods);
         auto reordered = ci::BuildTypeDatabase(fixture.header, reversed);
-        const auto* reorderedType = reordered->GetType("Tests.Parameterized");
+        const auto* reorderedType = QueryType(reordered, "Tests.Parameterized");
         Check(reorderedType->defaultCtorIndex == reordered->GetMethodDef(reorderedType, ".ctor()") - reordered->methods.data(), "default constructor index is independent of overload order");
         auto invalid = specs;
         invalid[1].methods[1].binding = {};
@@ -2445,8 +2464,11 @@ int main(int argc, char** argv) {
             auto plugin = ci::ParseProviderConfig(description, source);
             Check(!plugin.types.empty() && ci::LoadClassProviderBindings(plugin), "merged provider declarations and function versions");
             const auto module = GetModuleHandleW(plugin.dllPath.c_str());
-            Check(module && GetProcAddress(module, "ci_register_provider") && GetProcAddress(module, "ci_on_tdb_ready")
-                && GetProcAddress(module, "reframework_plugin_initialize") && GetProcAddress(module, "reframework_plugin_required_version"), "same DLL provides CI and REFramework entries");
+            Check(module && GetProcAddress(module, "ci_register_provider") &&
+                      GetProcAddress(module, "ci_on_initialize") &&
+                      GetProcAddress(module, "reframework_plugin_initialize") &&
+                      GetProcAddress(module, "reframework_plugin_required_version"),
+                  "same DLL provides CI and REFramework entries");
             Check(!GetProcAddress(module, "RiseFrameworkSetMethodDispatch"), "retired cross-DLL dispatch export is absent");
             const auto reused = LoadLibraryExW(plugin.dllPath.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
             Check(reused == module, "later load of the same plugin path reuses HMODULE");
@@ -2713,17 +2735,19 @@ int main(int argc, char** argv) {
             Check(queries.notifications == 1 && !queries.sdkInitializedAtReady &&
                       queries.context == &ci::GetContext() && queries.missingQueriesAreNull,
                   "actual DLL callback is one-shot before its SDK initialization");
-            Check(queries.originalType == classMetadata->GetType("via.Prefab") &&
-                      queries.customType == &classMetadata->types[arg->index], "ready callback uses the published records");
+            Check(queries.originalType == QueryType(classMetadata, "via.Prefab") &&
+                      queries.customType == &classMetadata->types[arg->index],
+                  "ready callback uses the published records");
             Check(queries.originalMethod && queries.originalOverload &&
                       queries.originalMethod != queries.originalOverload, "original overloaded AOT entries at ready");
             Check(queries.echo && queries.echo == queries.inheritedEcho && queries.outId &&
                       queries.constructor && queries.genericMethod, "custom/inherited/out/constructor/generic entries at ready");
-            Check(classMetadata->GetType("System.Int32[]") &&
-                      classMetadata->GetType("ace.btable.cCommandAction`1<ClassInjector.Tests.Arg>"),
+            Check(QueryType(classMetadata, "System.Int32[]") &&
+                      QueryType(classMetadata, "ace.btable.cCommandAction`1<ClassInjector.Tests.Arg>"),
                   "array and closed generic type names");
-            auto* tuple = classMetadata->GetType("System.ValueTuple`2<System.UInt32,System.UInt32>");
-            Check(tuple && classMetadata->GetMethod(tuple, "Equals(System.ValueTuple`2<System.UInt32,System.UInt32>)"),
+            auto* tuple = QueryType(classMetadata, "System.ValueTuple`2<System.UInt32,System.UInt32>");
+            Check(tuple &&
+                      QueryMethod(classMetadata, tuple, "Equals(System.ValueTuple`2<System.UInt32,System.UInt32>)"),
                   "generic comma stays within parameter type without a signature parser");
             for (auto& method : classMetadata->customMethods) {
                 const auto& declaration = expectedClassMethods[method.index - classMetadata->originalMethodCount];
@@ -2937,10 +2961,10 @@ int main(int argc, char** argv) {
                 }
                 throw std::runtime_error("interface method missing");
             };
-            using FnVoid = void (*)(void*, void*);
-            using FnBoolean = bool (*)(void*, void*);
-            using FnObject = void* (*)(void*, void*);
-            using FnCompare = int32_t (*)(void*, void*, void*);
+            using FnVoid = void (*)(void* vmContext, void* object);
+            using FnBoolean = bool (*)(void* vmContext, void* object);
+            using FnObject = void* (*)(void* vmContext, void* object);
+            using FnCompare = int32_t (*)(void* vmContext, void* object, void* other);
             auto moveNext = reinterpret_cast<FnBoolean>(InterfaceEntry("System.Collections.IEnumerator", "MoveNext"));
             Check(moveNext(&contextMarker, &interfaceObject) && moveNext(&contextMarker, &interfaceObject) &&
                       moveNext(&contextMarker, &interfaceObject) && !moveNext(&contextMarker, &interfaceObject),
@@ -2997,20 +3021,25 @@ int main(int argc, char** argv) {
         auto* self = reinterpret_cast<reframework::API::ManagedObject*>(&instance);
         native.types[child.index].objectInfo = instance.info;
         native.types[native.types[child.index].parentTypeIndex].objectInfo = nullptr;
-        ci::FieldLayout earlyCounter{}, earlyBonus{};
-        Check(native.TryGetFieldLayout(&native.types[child.index], "Counter", earlyCounter) &&
-                  native.TryGetFieldLayout(&native.types[child.index], "Bonus", earlyBonus) &&
-                  earlyCounter.objectOffset == 16 && earlyCounter.valueOffset == 0 && earlyCounter.valueSize == 4 &&
-                  earlyBonus.objectOffset == 24 && earlyBonus.valueOffset == 8 && earlyBonus.valueSize == 4 &&
-                  !native.TryGetFieldLayout(&native.types[child.index], "Missing", earlyBonus),
-              "early instance field query preserves inherited/embedded/boxed offsets without RF SDK");
+        const auto& metadata = ci::GetMetadataAPI();
+        const auto earlyOwner = reinterpret_cast<ci::TypeDefinitionHandle>(&native.types[child.index]);
+        const auto earlyCounter = metadata.type_definition->find_field(earlyOwner, "Counter");
+        const auto earlyBonus = metadata.type_definition->find_field(earlyOwner, "Bonus");
+        Check(earlyCounter && earlyBonus && metadata.field->get_offset_from_fieldptr(earlyCounter) == 0 &&
+                  metadata.field->get_offset_from_fieldptr(earlyBonus) == 8 &&
+                  metadata.field->get_data_raw(earlyCounter, &instance, false) ==
+                      reinterpret_cast<uint8_t*>(&instance) + 16 &&
+                  metadata.field->get_data_raw(earlyBonus, &instance, false) ==
+                      reinterpret_cast<uint8_t*>(&instance) + 24 &&
+                  metadata.type_definition->get_valuetype_size(metadata.field->get_type(earlyCounter)) == 4 &&
+                  !metadata.type_definition->find_field(earlyOwner, "Missing"),
+              "REF field offsets, inherited actual-object addressing and payload without RF SDK");
         auto& bonusLayout = native.fieldImpls[native.fields[native.types[child.index].memberFieldIndex].impl];
         const auto oldAttributes = bonusLayout.attributes;
         bonusLayout.attributes = 0x10;
-        Check(native.TryGetFieldLayout(&native.types[child.index], "Bonus", earlyBonus),
-              "custom-attribute index is not the Static field flag");
+        Check(!metadata.field->is_static(earlyBonus), "attribute index is not Static flag");
         bonusLayout.flags |= 0x10;
-        Check(!native.TryGetFieldLayout(&native.types[child.index], "Bonus", earlyBonus), "early query excludes static fields");
+        Check(metadata.field->is_static(earlyBonus), "static declaration remains queryable");
         bonusLayout.flags &= ~0x10;
         bonusLayout.attributes = oldAttributes;
         instance.fields.fill(int32_t(0xCCCCCCCC));

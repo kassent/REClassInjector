@@ -1,7 +1,8 @@
-#include "ClassProvider.h"
-#include <GameTypes.h>
-#include "TypeDatabaseRecords.h"
 #include "InvokeAdapters.h"
+#include "TypeDatabaseRecords.h"
+#include <GameTypes.h>
+#include <ci/API.hpp>
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <sol/sol.hpp>
 
@@ -10,14 +11,18 @@ static const ci::ProviderContext* ProviderContext{};
 
 // self 为 ClassInjector.Tests.FiveArguments；first/third 声明为 System.Object。
 static void Initialize(void* context, void* self, void* first, int32_t second, void* third, int32_t fourth, uint32_t fifth) noexcept {
-    ProviderContext->AssignReference(self, ProviderContext->GetField<void*>(self, "First"), first);
-    ProviderContext->AssignReference(self, ProviderContext->GetField<void*>(self, "Third"), third);
-    *ProviderContext->GetField<int32_t>(self, "Second") = second;
-    *ProviderContext->GetField<int32_t>(self, "Fourth") = fourth;
-    *ProviderContext->GetField<uint32_t>(self, "Fifth") = fifth;
-    ++*ProviderContext->GetField<int32_t>(self, "Calls");
-    *ProviderContext->GetField<int32_t>(self, "ManagedEntry") = RE::read_offset_data<int32_t>(context, 0x78);
-    *ProviderContext->GetField<int32_t>(self, "ManagedDepth") = RE::read_offset_data<int32_t>(context, 0x7C);
+    ProviderContext->sdk->managed_object->assign_reference(
+        self, ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<void*>("First"), first);
+    ProviderContext->sdk->managed_object->assign_reference(
+        self, ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<void*>("Third"), third);
+    *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>("Second") = second;
+    *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>("Fourth") = fourth;
+    *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<uint32_t>("Fifth") = fifth;
+    ++*ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>("Calls");
+    *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>("ManagedEntry") =
+        RE::read_offset_data<int32_t>(context, 0x78);
+    *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<int32_t>("ManagedDepth") =
+        RE::read_offset_data<int32_t>(context, 0x7C);
 }
 
 static void InitializeOriginal(void* context, void* self, void* first, int32_t second, void* third, int32_t fourth, bool fifth) noexcept {
@@ -49,7 +54,7 @@ static void InitializeLua(lua_State* state) {
 }
 } // namespace ClassInjectorFiveArgumentTests
 
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
     ClassInjectorFiveArgumentTests::ProviderContext = context;
 }
 extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFrameworkPluginInitializeParam* parameter) {
@@ -60,5 +65,6 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
 }
 CI_REGISTER_PROVIDER(registration) {
     using namespace ClassInjectorFiveArgumentTests;
-    registration.RegisterFunction("Initialize", &Initialize, 1).RegisterFunction("InitializeOriginal", &InitializeOriginal, 1);
+    registration.register_func("Initialize", &Initialize, 1)
+        .register_func("InitializeOriginal", &InitializeOriginal, 1);
 }

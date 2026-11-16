@@ -1,1 +1,1 @@
-# 显式测试插件：同名 DLL 通过 ci_on_tdb_ready 借用生产 Context，无类型声明。
+# 显式测试插件：同名 DLL 通过 ci_on_initialize 借用生产 Context，无类型声明。

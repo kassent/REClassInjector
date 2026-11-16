@@ -1,10 +1,11 @@
-#include "ClassProvider.h"
-#include <GameTypes.h>
-#include "TypeDatabaseRecords.h"
 #include "InvokeAdapters.h"
+#include "TypeDatabaseRecords.h"
+#include <GameTypes.h>
+#include <bit>
+#include <ci/API.hpp>
+#include <ci/Provider.hpp>
 #include <lua.hpp>
 #include <sol/sol.hpp>
-#include <bit>
 #include <stdexcept>
 
 // 独立的浮点 ABI／托管虚调用 provider；诊断不进入生产插件。
@@ -12,11 +13,12 @@ namespace ClassInjectorFloatingReturnTests {
 static const ci::ProviderContext* ProviderContext{};
 
 // self 均为 ClassInjector.Tests.FloatingReturnBase 或其派生实例；按真实 C++ 浮点 ABI 返回。
-static float GetSingle(void*, void* self) noexcept {
-    return *ProviderContext->GetField<float>(self, "SingleValue");
+static float GetSingle(void* vmContext, void* self) noexcept {
+    return *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<float>("SingleValue");
 }
-static double GetDouble(void*, void* self) noexcept {
-    return *ProviderContext->GetField<double>(self, "DoubleValue");
+
+static double GetDouble(void* vmContext, void* self) noexcept {
+    return *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<double>("DoubleValue");
 }
 static float GetNegativeSingle(void* vmctx, void* self) noexcept {
     return -GetSingle(vmctx, self);
@@ -48,13 +50,15 @@ static sol::table NativeReturns(sol::this_state state, uintptr_t address) {
     const auto count = RE::read_offset_data<uint32_t>(vmctx, 0x78);
     const auto depth = RE::read_offset_data<uint32_t>(vmctx, 0x7C);
     Check(count > 0 && depth > 0, "probe needs a native managed call scope");
-    const auto* base = ProviderContext->GetType("ClassInjector.Tests.FloatingReturnBase");
-    const auto single = *ProviderContext->GetField<float>(self, "SingleValue");
-    const auto real = *ProviderContext->GetField<double>(self, "DoubleValue");
-    using FnGetSingle = float (*)(void*, void*);
-    using FnGetDouble = double (*)(void*, void*);
-    auto getSingle = reinterpret_cast<FnGetSingle>(ProviderContext->GetMethod(base, "get_Single()"));
-    auto getDouble = reinterpret_cast<FnGetDouble>(ProviderContext->GetMethod(base, "get_Double()"));
+    const auto* base = ProviderContext->sdk->tdb->find_type("ClassInjector.Tests.FloatingReturnBase");
+    const auto single = *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<float>("SingleValue");
+    const auto real = *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<double>("DoubleValue");
+    using FnGetSingle = float (*)(void* vmContext, void* object);
+    using FnGetDouble = double (*)(void* vmContext, void* object);
+    auto getSingle = reinterpret_cast<FnGetSingle>(ProviderContext->sdk->method->get_function(
+        ProviderContext->sdk->type_definition->find_method(base, "get_Single()")));
+    auto getDouble = reinterpret_cast<FnGetDouble>(ProviderContext->sdk->method->get_function(
+        ProviderContext->sdk->type_definition->find_method(base, "get_Double()")));
     Check(getSingle && getDouble, "floating-point entry missing");
     CheckReturn(getSingle(vmctx, self), single);
     CheckReturn(getDouble(vmctx, self), real);
@@ -91,8 +95,8 @@ static sol::table VirtualSequence(sol::this_state state, uintptr_t baseAddress, 
     Check(derived->get_type_definition()->get_full_name() == "ClassInjector.Tests.FloatingReturnDerived",
           "sequence requires the actual derived instance second");
     for (auto* self : {base, derived, base, derived}) {
-        const auto single = *ProviderContext->GetField<float>(self, "SingleValue");
-        const auto real = *ProviderContext->GetField<double>(self, "DoubleValue");
+        const auto single = *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<float>("SingleValue");
+        const auto real = *ci::API::ManagedObject{ProviderContext->sdk, self}.get_field<double>("DoubleValue");
         CheckReturn(CallVirtualSingle(self), self == base ? single : -single);
         CheckReturn(CallVirtualDouble(self), self == base ? real : -real);
     }
@@ -130,7 +134,7 @@ static void InitializeLua(lua_State* state) {
 }
 } // namespace ClassInjectorFloatingReturnTests
 
-extern "C" __declspec(dllexport) void ci_on_tdb_ready(const ci::ProviderContext* context) noexcept {
+extern "C" __declspec(dllexport) void ci_on_initialize(const ci::ProviderContext* context) noexcept {
     ClassInjectorFloatingReturnTests::ProviderContext = context;
 }
 extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFrameworkPluginVersion* version) {
@@ -144,8 +148,8 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
 }
 CI_REGISTER_PROVIDER(registration) {
     using namespace ClassInjectorFloatingReturnTests;
-    registration.RegisterFunction("GetSingle", &GetSingle, 1)
-        .RegisterFunction("GetDouble", &GetDouble, 1)
-        .RegisterFunction("GetNegativeSingle", &GetNegativeSingle, 1)
-        .RegisterFunction("GetNegativeDouble", &GetNegativeDouble, 1);
+    registration.register_func("GetSingle", &GetSingle, 1)
+        .register_func("GetDouble", &GetDouble, 1)
+        .register_func("GetNegativeSingle", &GetNegativeSingle, 1)
+        .register_func("GetNegativeDouble", &GetNegativeDouble, 1);
 }

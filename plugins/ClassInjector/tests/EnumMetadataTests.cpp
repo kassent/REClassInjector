@@ -1,8 +1,9 @@
-#include "TypeDatabaseBuilder.h"
 #include "ClassInjectorTestAccess.h"
 #include "ClassProviders.h"
+#include "TypeDatabaseBuilder.h"
 #include <algorithm>
 #include <array>
+#include <ci/Provider.hpp>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -362,10 +363,10 @@ renames=[{fromValue=0,to='Canonical'}, {fromName='Canonical',to='Interim'},
         Reject(incomplete, {single});
     }
     Check(fixture.types[4].memberFieldIndex == 0 && fixture.fieldImpls[1].name == renamed->fieldImpls[1].name, "failed value selection changed original metadata");
-    const ci::ProviderRegistrationApi unavailableApi{};
-    ci::ProviderRegistration unavailable(unavailableApi);
-    unavailable.ExtendEnum("Tests.Color", {ci::EnumRename::FromValue(0, "Zero")}, {});
-    Check(!unavailable.HasSucceeded(), "unavailable enum callback must fail registration");
+    const ci::RegistrationAPI unavailableAPI{};
+    ci::Registration unavailable(unavailableAPI);
+    unavailable.register_enum("Tests.Color", {.renames = {ci::EnumRename::by_value(0, "Zero")}});
+    Check(unavailable.has_errors(), "unavailable enum callback must fail registration");
     std::cout << "PASS: value-selected canonical rename, mixed declaration order, appended zero/negative/bounds, signed pools, COW, exact no-op capacity, stable publication and invalid sources\n";
 }
 
@@ -403,9 +404,11 @@ static void TestRenameSourceValidation() {
         catch (const std::exception&) { rejected = true; }
         Check(rejected, "invalid/ambiguous TOML rename source accepted");
     }
-    const auto name = ci::EnumRename::FromName("Zero", "Nil");
-    const auto zero = ci::EnumRename::FromValue(0, "Nil");
-    Check(name.source == ci::EnumRenameSource::Name && std::string_view(name.fromName) == "Zero" && zero.source == ci::EnumRenameSource::Value && zero.fromValue == 0, "POD factories must select a source explicitly without a zero sentinel");
+    const auto name = ci::EnumRename::by_name("Zero", "Nil");
+    const auto zero = ci::EnumRename::by_value(0, "Nil");
+    Check(name.kind == ci::EnumMatchKind::Name && std::string_view(name.from_name) == "Zero" &&
+              zero.kind == ci::EnumMatchKind::Value && zero.from_value == 0,
+          "POD factories must select a source explicitly without a zero sentinel");
     std::cout << "PASS: unified fromName/fromValue XOR, required target, strict Int32, obsolete from rejection and tagged POD factories\n";
 }
 }

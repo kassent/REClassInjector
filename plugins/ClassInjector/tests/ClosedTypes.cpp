@@ -1,5 +1,5 @@
-#include "ClassProvider.h"
 #include <GameTypes.h>
+#include <ci/Provider.hpp>
 
 using ManagedObject = reframework::API::ManagedObject;
 
@@ -21,11 +21,11 @@ void ReferenceTimerStart(void*, ManagedObject* self, ManagedObject*) noexcept {
 }
 
 CI_REGISTER_PROVIDER(registration) {
-    registration.RegisterFunction("GetTimerType", &GetTimerType, 1)
-        .RegisterFunction("SetTimerType", &SetTimerType, 1)
-        .RegisterFunction("TimerStart", &TimerStart, 1)
-        .RegisterFunction("DerivedTimerStart", &DerivedTimerStart, 1)
-        .RegisterFunction("ReferenceTimerStart", &ReferenceTimerStart, 1);
+    registration.register_func("GetTimerType", &GetTimerType, 1)
+        .register_func("SetTimerType", &SetTimerType, 1)
+        .register_func("TimerStart", &TimerStart, 1)
+        .register_func("DerivedTimerStart", &DerivedTimerStart, 1)
+        .register_func("ReferenceTimerStart", &ReferenceTimerStart, 1);
 }
 
 // 显式测试 provider 自行完成 SDK 初始化，不让生产 host 代管 SDK 或字段访问。

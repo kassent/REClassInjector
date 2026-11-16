@@ -1,320 +1,599 @@
 {
   "sourceRepository": "https://github.com/kassent/mhwilds",
-  "sourceCommit": "85aaed8c5fb8a6aa8351fcf9485436d8f66f4cb9",
+  "sourceCommit": "30bcbe1b8eaa29fa0a06cb0028ecdd1f64a8738a",
+  "sourceWorkingTreeChanges": {
+    "plugins/ClassInjector/DEVELOPER_GUIDE.en.md": "31b0273269901bd1fa5c6a9970a1596e292889aa7d3a7c2413919e8c8c905865",
+    "plugins/ClassInjector/DEVELOPER_GUIDE.md": "a591c09307714f424088131ba53f0e7cffcbab3f343cdcbcd3a6abb91a37d972"
+  },
   "commonCommit": "e7f816cef21dbe7db5bd2cbb0173269aaaa49093",
+  "sdkABI": 3,
   "files": {
+    "README.md": {
+      "sourcePath": "plugins/ClassInjector/DEVELOPER_GUIDE.en.md",
+      "sha256": "ea902ee039748ed4c460337fc6c07a4e2fce676442bb7de2f4adde83d230c223",
+      "sourceSha256": "31b0273269901bd1fa5c6a9970a1596e292889aa7d3a7c2413919e8c8c905865",
+      "adapted": true
+    },
+    "README.zh-CN.md": {
+      "sourcePath": "plugins/ClassInjector/DEVELOPER_GUIDE.md",
+      "sha256": "aacb80564a63265c8f03e0ce0320d15b87cd581dba996f34d9b6eea2614c4646",
+      "sourceSha256": "a591c09307714f424088131ba53f0e7cffcbab3f343cdcbcd3a6abb91a37d972",
+      "adapted": true
+    },
+    "include/ci/API.h": {
+      "sourcePath": "plugins/ClassInjector/include/ci/API.h",
+      "sha256": "bcd1de3f7e72654ddf2437e3a6e458881e4a92dc62efe12f3cabdc2f3280ee68",
+      "sourceSha256": "bcd1de3f7e72654ddf2437e3a6e458881e4a92dc62efe12f3cabdc2f3280ee68",
+      "adapted": false
+    },
+    "include/ci/API.hpp": {
+      "sourcePath": "plugins/ClassInjector/include/ci/API.hpp",
+      "sha256": "696bdc5810995e1d405ff6a4cf420ae0b50b0386483c1aab589013ca73a32f7b",
+      "sourceSha256": "696bdc5810995e1d405ff6a4cf420ae0b50b0386483c1aab589013ca73a32f7b",
+      "adapted": false
+    },
+    "include/ci/Provider.h": {
+      "sourcePath": "plugins/ClassInjector/include/ci/Provider.h",
+      "sha256": "519bcd966510ce36fbe141b680c620cfd0a124bc7c7d041eb7f8eb3d1b585e8f",
+      "sourceSha256": "519bcd966510ce36fbe141b680c620cfd0a124bc7c7d041eb7f8eb3d1b585e8f",
+      "adapted": false
+    },
+    "include/ci/Provider.hpp": {
+      "sourcePath": "plugins/ClassInjector/include/ci/Provider.hpp",
+      "sha256": "73c3a367cdf92d694c115528af7b84a490cd0dd4ca232f3a747dea5e19466159",
+      "sourceSha256": "73c3a367cdf92d694c115528af7b84a490cd0dd4ca232f3a747dea5e19466159",
+      "adapted": false
+    },
+    "plugins/ClassInjector/.clang-format": {
+      "sourcePath": "plugins/ClassInjector/.clang-format",
+      "sha256": "5c2a5e040d758abd1960270eb889f3b475da60c50c9fe77091241c2071dd5885",
+      "sourceSha256": "5c2a5e040d758abd1960270eb889f3b475da60c50c9fe77091241c2071dd5885",
+      "adapted": false
+    },
     "plugins/ClassInjector/CMakeLists.txt": {
-      "sha256": "858bf4bc283ed5f863cd5f9d403899973b755c9c34bf61478e149ec8399b36c8",
+      "sourcePath": "plugins/ClassInjector/CMakeLists.txt",
+      "sha256": "31697249c2ad1f571cd7250cb5290ae580cf07c414098eeba51f1ff2f97041e9",
+      "sourceSha256": "31697249c2ad1f571cd7250cb5290ae580cf07c414098eeba51f1ff2f97041e9",
       "adapted": false
-    },
-    "plugins/HIDWrapper/CMakeLists.txt": {
-      "sha256": "4d76e4b96ad5a7d6b42d65dbd6afc34a9918880f942b2176ff4b7546ca159617",
-      "adapted": true
-    },
-    "plugins/HIDWrapper/hid.asm": {
-      "sha256": "b2505293692c0507566e5f2b8003ce957d454e7df60e5879472ced21e008ecc9",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/hid.def": {
-      "sha256": "e951bdda7a2c2dca2b1998ed0224e8c797a83f86f078504ccfc1cfdf3cc817b6",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/src/hid.cpp": {
-      "sha256": "87b62fade7dd8b9eac5b699f1f71e8e695028e5febd581e4ccb51b52ef2939aa",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/src/HIDExports.inc": {
-      "sha256": "67812b54d5b81defe349d0827ec32ec25ae80ca1418d69ac6487476fa071f892",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/tests/HIDWrapperTests.cpp": {
-      "sha256": "9b655946e588a476a120ac2de0d244253111b0803398b7c68ee1545be5219825",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/tests/test_hid_deployment.py": {
-      "sha256": "8c3b681556724ef9585b47c41928499594e2ba78f23f2d36e8d8c9e0f0f8c328",
-      "adapted": false
-    },
-    "plugins/HIDWrapper/tools/deploy_hid.ps1": {
-      "sha256": "df804194786169e6f58a6e9e28ec135e142a986688172b3a017308df9e8180f1",
-      "adapted": true
-    },
-    "plugins/HIDWrapper/tools/remove_standalone_injector.ps1": {
-      "sha256": "b2c80025ecf144dcac7c2cbe55d415370ab5aa0ee064e0130aa2427cff46e616",
-      "adapted": true
     },
     "plugins/ClassInjector/examples/CppMethods.cpp": {
-      "sha256": "bb445337198714eee25be448a401493c5be426a073fe06dea40668d5996018f6",
+      "sourcePath": "plugins/ClassInjector/examples/CppMethods.cpp",
+      "sha256": "a283eac1ee4d6f200bc22e73b46b1e332851f71ac0ed75d8fa9cdbc5bad82e65",
+      "sourceSha256": "a283eac1ee4d6f200bc22e73b46b1e332851f71ac0ed75d8fa9cdbc5bad82e65",
       "adapted": false
     },
     "plugins/ClassInjector/examples/ManagedTypes_ci.toml": {
+      "sourcePath": "plugins/ClassInjector/examples/ManagedTypes_ci.toml",
       "sha256": "a9b0cd4ae3c58472927b4e8a7daa5caaf0319ffcd5967f237f95bc0e5d1657ef",
+      "sourceSha256": "a9b0cd4ae3c58472927b4e8a7daa5caaf0319ffcd5967f237f95bc0e5d1657ef",
       "adapted": false
     },
     "plugins/ClassInjector/examples/sample.toml": {
+      "sourcePath": "plugins/ClassInjector/examples/sample.toml",
       "sha256": "372d2e482cb39faa8ad7aaf1f8427fbf48eb36ff8a2e5546edcf6a860baf9f9b",
+      "sourceSha256": "372d2e482cb39faa8ad7aaf1f8427fbf48eb36ff8a2e5546edcf6a860baf9f9b",
       "adapted": false
     },
     "plugins/ClassInjector/include/ClassInjector.h": {
+      "sourcePath": "plugins/ClassInjector/include/ClassInjector.h",
       "sha256": "f744e407d4487c8a76c41f92a92d14069967e7b65d529a4e9934ae8e4bfc7309",
+      "sourceSha256": "f744e407d4487c8a76c41f92a92d14069967e7b65d529a4e9934ae8e4bfc7309",
       "adapted": false
     },
-    "plugins/ClassInjector/include/ClassProvider.h": {
-      "sha256": "13c42f2a21c4ec08a43427cdf0a9278d7016841e95d56e883806f73baff9f0c7",
+    "plugins/ClassInjector/include/ci/API.h": {
+      "sourcePath": "plugins/ClassInjector/include/ci/API.h",
+      "sha256": "bcd1de3f7e72654ddf2437e3a6e458881e4a92dc62efe12f3cabdc2f3280ee68",
+      "sourceSha256": "bcd1de3f7e72654ddf2437e3a6e458881e4a92dc62efe12f3cabdc2f3280ee68",
+      "adapted": false
+    },
+    "plugins/ClassInjector/include/ci/API.hpp": {
+      "sourcePath": "plugins/ClassInjector/include/ci/API.hpp",
+      "sha256": "696bdc5810995e1d405ff6a4cf420ae0b50b0386483c1aab589013ca73a32f7b",
+      "sourceSha256": "696bdc5810995e1d405ff6a4cf420ae0b50b0386483c1aab589013ca73a32f7b",
+      "adapted": false
+    },
+    "plugins/ClassInjector/include/ci/Provider.h": {
+      "sourcePath": "plugins/ClassInjector/include/ci/Provider.h",
+      "sha256": "519bcd966510ce36fbe141b680c620cfd0a124bc7c7d041eb7f8eb3d1b585e8f",
+      "sourceSha256": "519bcd966510ce36fbe141b680c620cfd0a124bc7c7d041eb7f8eb3d1b585e8f",
+      "adapted": false
+    },
+    "plugins/ClassInjector/include/ci/Provider.hpp": {
+      "sourcePath": "plugins/ClassInjector/include/ci/Provider.hpp",
+      "sha256": "73c3a367cdf92d694c115528af7b84a490cd0dd4ca232f3a747dea5e19466159",
+      "sourceSha256": "73c3a367cdf92d694c115528af7b84a490cd0dd4ca232f3a747dea5e19466159",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassFields.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ClassFields.cpp",
       "sha256": "0713f5075de3bc7603b403baea1b3e696cd4fa5b10b60f84511896031f791aeb",
+      "sourceSha256": "0713f5075de3bc7603b403baea1b3e696cd4fa5b10b60f84511896031f791aeb",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassFields.h": {
+      "sourcePath": "plugins/ClassInjector/src/ClassFields.h",
       "sha256": "1a7ac5e4d8ce425bb59406d97c9657c7b67807e1f61974bdb27a53fb1b83ab2f",
+      "sourceSha256": "1a7ac5e4d8ce425bb59406d97c9657c7b67807e1f61974bdb27a53fb1b83ab2f",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassMethods.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ClassMethods.cpp",
       "sha256": "d5cc4f1e3bdeeb39a8fc7e145ed0a1a470ff87d55590b178cd5691a972702390",
+      "sourceSha256": "d5cc4f1e3bdeeb39a8fc7e145ed0a1a470ff87d55590b178cd5691a972702390",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassMethods.h": {
+      "sourcePath": "plugins/ClassInjector/src/ClassMethods.h",
       "sha256": "682b9d73325c72b45eea0724508a0583aac1f643cd9461c6421ec465c0d1b54a",
+      "sourceSha256": "682b9d73325c72b45eea0724508a0583aac1f643cd9461c6421ec465c0d1b54a",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassProviderContext.cpp": {
-      "sha256": "9b62909266d849f916695af192eea90b88155da19a4fd7ef1e3380c4b02d8a48",
+      "sourcePath": "plugins/ClassInjector/src/ClassProviderContext.cpp",
+      "sha256": "22b639b99240ff08dbc5b033169ba628ac976e18b1060f212207cb2f607a1724",
+      "sourceSha256": "22b639b99240ff08dbc5b033169ba628ac976e18b1060f212207cb2f607a1724",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassProviderContext.h": {
-      "sha256": "fed059bcbacfe7caeec38c937c318ef268a478db39f163e2d94c2490e614c151",
+      "sourcePath": "plugins/ClassInjector/src/ClassProviderContext.h",
+      "sha256": "f3e1b9774197c9f5670440113445e1e231f7a5dc35fa3b53a8282458bd252e1a",
+      "sourceSha256": "f3e1b9774197c9f5670440113445e1e231f7a5dc35fa3b53a8282458bd252e1a",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassProviders.cpp": {
-      "sha256": "3f85d2fee1dfd897fb13d0c2c8dbea2d8f9fb62cdd2bed6e08566e507c36f1c7",
+      "sourcePath": "plugins/ClassInjector/src/ClassProviders.cpp",
+      "sha256": "860c6d334b474f35d6cd1ade51984cab95301f73d2e487cc09ea3f89d4a4ae3c",
+      "sourceSha256": "860c6d334b474f35d6cd1ade51984cab95301f73d2e487cc09ea3f89d4a4ae3c",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassProviders.h": {
-      "sha256": "543d6c66d2d519de93f32db4729694968ba1032e12bd9cb7178d042577947896",
+      "sourcePath": "plugins/ClassInjector/src/ClassProviders.h",
+      "sha256": "f95ea54580013da920e278f6a6cdbc2c1a168fdb84ae17be6a5e93d38db8f02b",
+      "sourceSha256": "f95ea54580013da920e278f6a6cdbc2c1a168fdb84ae17be6a5e93d38db8f02b",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassVirtualTable.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ClassVirtualTable.cpp",
       "sha256": "28b575c9a6629ac737478fc9c2fd9882787759bf5cb2072564ba720ae913b377",
+      "sourceSha256": "28b575c9a6629ac737478fc9c2fd9882787759bf5cb2072564ba720ae913b377",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassVirtualTable.h": {
+      "sourcePath": "plugins/ClassInjector/src/ClassVirtualTable.h",
       "sha256": "4af4cd8d60fe846517374304e3739f33d01b2fc367957e42bcb02f8450a051b1",
+      "sourceSha256": "4af4cd8d60fe846517374304e3739f33d01b2fc367957e42bcb02f8450a051b1",
       "adapted": false
     },
     "plugins/ClassInjector/src/CustomTypeBuildSpec.h": {
+      "sourcePath": "plugins/ClassInjector/src/CustomTypeBuildSpec.h",
       "sha256": "e0f9ea88d951e93fd8a1c2456fb3f7bd3fa3589446c6b439a6f3f081f9dfd430",
+      "sourceSha256": "e0f9ea88d951e93fd8a1c2456fb3f7bd3fa3589446c6b439a6f3f081f9dfd430",
       "adapted": false
     },
     "plugins/ClassInjector/src/CustomTypeConfig.h": {
+      "sourcePath": "plugins/ClassInjector/src/CustomTypeConfig.h",
       "sha256": "07a1d5a3190b3201ddcae23b992dd1f6c1215007e05d1526e6357fa1b50c6e76",
+      "sourceSha256": "07a1d5a3190b3201ddcae23b992dd1f6c1215007e05d1526e6357fa1b50c6e76",
       "adapted": false
     },
     "plugins/ClassInjector/src/EnumMembers.cpp": {
-      "sha256": "e5d6b2f6a0283c46906ec2eddf2a779d15f4941fc3a2c31a1a40a473501a9785",
+      "sourcePath": "plugins/ClassInjector/src/EnumMembers.cpp",
+      "sha256": "cc44efd526c35210aa043bb9fc3564bf117939dbc9224873a0e8f2dd648d7d46",
+      "sourceSha256": "cc44efd526c35210aa043bb9fc3564bf117939dbc9224873a0e8f2dd648d7d46",
       "adapted": false
     },
     "plugins/ClassInjector/src/EnumMembers.h": {
+      "sourcePath": "plugins/ClassInjector/src/EnumMembers.h",
       "sha256": "3841296349cc68d1048bd0b1b0ba75b2be1578e305e3d84749aefae9272d5f0f",
+      "sourceSha256": "3841296349cc68d1048bd0b1b0ba75b2be1578e305e3d84749aefae9272d5f0f",
       "adapted": false
     },
     "plugins/ClassInjector/src/GenericTypes.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/GenericTypes.cpp",
       "sha256": "e28abcd540c657e42a1c9ea8f1864ebdc9959d6bb2ca867db5d07d5b65252538",
+      "sourceSha256": "e28abcd540c657e42a1c9ea8f1864ebdc9959d6bb2ca867db5d07d5b65252538",
       "adapted": false
     },
     "plugins/ClassInjector/src/GenericTypes.h": {
+      "sourcePath": "plugins/ClassInjector/src/GenericTypes.h",
       "sha256": "86b7faf7c1a8a5b5e7ff487ad39c2f7c114087430dda76546276620ddf2793df",
+      "sourceSha256": "86b7faf7c1a8a5b5e7ff487ad39c2f7c114087430dda76546276620ddf2793df",
       "adapted": false
     },
     "plugins/ClassInjector/src/InvokeAdapters.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/InvokeAdapters.cpp",
       "sha256": "138dd3455e5e7ae4706112f6c180e963a015b31e7c1e792a59e6cd4812272bb9",
+      "sourceSha256": "138dd3455e5e7ae4706112f6c180e963a015b31e7c1e792a59e6cd4812272bb9",
       "adapted": false
     },
     "plugins/ClassInjector/src/InvokeAdapters.h": {
+      "sourcePath": "plugins/ClassInjector/src/InvokeAdapters.h",
       "sha256": "1486f4215118aaf41dc5e238f3e242a4488056b96f988515ba1659f9c1235c36",
+      "sourceSha256": "1486f4215118aaf41dc5e238f3e242a4488056b96f988515ba1659f9c1235c36",
       "adapted": false
     },
     "plugins/ClassInjector/src/MethodTrampolines.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/MethodTrampolines.cpp",
       "sha256": "7074a0e52dfc14dcc4798d35352b2cf77ac8516e6b164cbe4fd4b7b4dd5385e3",
+      "sourceSha256": "7074a0e52dfc14dcc4798d35352b2cf77ac8516e6b164cbe4fd4b7b4dd5385e3",
       "adapted": false
     },
     "plugins/ClassInjector/src/MethodTrampolines.h": {
+      "sourcePath": "plugins/ClassInjector/src/MethodTrampolines.h",
       "sha256": "1a9fafcfea9836c1059968382bef1502f2fa8c32e278980aae138a3dc462ba6d",
+      "sourceSha256": "1a9fafcfea9836c1059968382bef1502f2fa8c32e278980aae138a3dc462ba6d",
       "adapted": false
     },
     "plugins/ClassInjector/src/ProviderConfig.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderConfig.cpp",
       "sha256": "3c840cb4124d3886180ef958bfc8e477653756a512fa649d382af7ab38c7879b",
+      "sourceSha256": "3c840cb4124d3886180ef958bfc8e477653756a512fa649d382af7ab38c7879b",
       "adapted": false
     },
     "plugins/ClassInjector/src/ProviderConfig.h": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderConfig.h",
       "sha256": "e231f100cbba5feba713d13366e8ca3663b015d98c069dd71d38ef32f39793ee",
+      "sourceSha256": "e231f100cbba5feba713d13366e8ca3663b015d98c069dd71d38ef32f39793ee",
+      "adapted": false
+    },
+    "plugins/ClassInjector/src/ProviderMetadataAPI.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderMetadataAPI.cpp",
+      "sha256": "ab58b004664276c9561f6a0af21bd13fce2c198a1b3b5901ef1bf7bd4786b2ba",
+      "sourceSha256": "ab58b004664276c9561f6a0af21bd13fce2c198a1b3b5901ef1bf7bd4786b2ba",
+      "adapted": false
+    },
+    "plugins/ClassInjector/src/ProviderMetadataAPI.h": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderMetadataAPI.h",
+      "sha256": "75d3ade9e8afcdb315d5a2b9b759a435875009bfff16e24a92dc7d184bf0d082",
+      "sourceSha256": "75d3ade9e8afcdb315d5a2b9b759a435875009bfff16e24a92dc7d184bf0d082",
+      "adapted": false
+    },
+    "plugins/ClassInjector/src/ProviderObjectAPI.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderObjectAPI.cpp",
+      "sha256": "3e32eafda99c2d233ff5be5f3fe33da5952da70941a40bca0ed4a8a2ee1f6ad3",
+      "sourceSha256": "3e32eafda99c2d233ff5be5f3fe33da5952da70941a40bca0ed4a8a2ee1f6ad3",
+      "adapted": false
+    },
+    "plugins/ClassInjector/src/ProviderResourceAPI.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderResourceAPI.cpp",
+      "sha256": "c1801e4aeb71558d6a310a96a4ddb2baaeb7866b5f6f1a44f1f4d06c3ddfb612",
+      "sourceSha256": "c1801e4aeb71558d6a310a96a4ddb2baaeb7866b5f6f1a44f1f4d06c3ddfb612",
+      "adapted": false
+    },
+    "plugins/ClassInjector/src/ProviderRuntimeAPI.h": {
+      "sourcePath": "plugins/ClassInjector/src/ProviderRuntimeAPI.h",
+      "sha256": "14d5ea1ae795a9f3728fd1660093a1ced54254bebdbd2cd1e4380af2cbf7a490",
+      "sourceSha256": "14d5ea1ae795a9f3728fd1660093a1ced54254bebdbd2cd1e4380af2cbf7a490",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabase.cpp": {
-      "sha256": "bd1be645b8a3cdb4b180faaa21bf5d1fe3af21df8d129b4e7b02c779a869a621",
+      "sourcePath": "plugins/ClassInjector/src/TypeDatabase.cpp",
+      "sha256": "c284529a293a24d72536a5d681bdc65323eee54ab7e6be181f985db96ff65f4f",
+      "sourceSha256": "c284529a293a24d72536a5d681bdc65323eee54ab7e6be181f985db96ff65f4f",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabase.h": {
-      "sha256": "3ee179ed83ee428a20d858487d9a37cf3e63cc574d9a9d210b40f623b87d0ed3",
+      "sourcePath": "plugins/ClassInjector/src/TypeDatabase.h",
+      "sha256": "48a0a706c3ce93e6d28d3720aac8a4f3636f7f67d644cdfdb390c99ef3ca3f1f",
+      "sourceSha256": "48a0a706c3ce93e6d28d3720aac8a4f3636f7f67d644cdfdb390c99ef3ca3f1f",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabaseBuilder.cpp": {
+      "sourcePath": "plugins/ClassInjector/src/TypeDatabaseBuilder.cpp",
       "sha256": "f633bcaa2048e554dd70e62603c12d139c565dc70bfa55b115e9763ca7b2248a",
+      "sourceSha256": "f633bcaa2048e554dd70e62603c12d139c565dc70bfa55b115e9763ca7b2248a",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabaseBuilder.h": {
+      "sourcePath": "plugins/ClassInjector/src/TypeDatabaseBuilder.h",
       "sha256": "80de5dd30db2565991a167a2fa74fa203a9d126e24eba94080cc1a97f1b7d91d",
+      "sourceSha256": "80de5dd30db2565991a167a2fa74fa203a9d126e24eba94080cc1a97f1b7d91d",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabaseRecords.h": {
+      "sourcePath": "plugins/ClassInjector/src/TypeDatabaseRecords.h",
       "sha256": "c5183ecefed51792f9172bbd3e74932378905070bb66b445c8f7f8df75e11084",
+      "sourceSha256": "c5183ecefed51792f9172bbd3e74932378905070bb66b445c8f7f8df75e11084",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeInjection.cpp": {
-      "sha256": "34a777514cbcb6232778967fa03e20460bb9963170c16bf631946c5ca46a9092",
+      "sourcePath": "plugins/ClassInjector/src/TypeInjection.cpp",
+      "sha256": "4f6fad9555affe41d16c57f8466e10dde6a846d9d0294c4f7bc424fd2c871ff1",
+      "sourceSha256": "4f6fad9555affe41d16c57f8466e10dde6a846d9d0294c4f7bc424fd2c871ff1",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeInjection.h": {
+      "sourcePath": "plugins/ClassInjector/src/TypeInjection.h",
       "sha256": "00adbbaa470cd7ccc2ddbd4f4373cfb78f9424972c5b58a2f1c0287b26478ce0",
-      "adapted": false
-    },
-    "plugins/ClassInjector/tests/audit_runtime_types.py": {
-      "sha256": "b8a2b0dd43bbeceb3ae837a552f3b1f743e06a813a18e7e845bee5bf6e8545c4",
-      "adapted": false
-    },
-    "plugins/ClassInjector/tests/capture_tdb.py": {
-      "sha256": "4ddd569084c7510ce4df4508aa8e917fdd141c6f4cb5893e2bc9c8d497cd5fa9",
+      "sourceSha256": "00adbbaa470cd7ccc2ddbd4f4373cfb78f9424972c5b58a2f1c0287b26478ce0",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClassInjectorTestAccess.h": {
+      "sourcePath": "plugins/ClassInjector/tests/ClassInjectorTestAccess.h",
       "sha256": "002b7c0a93979b38122c1f15eea68fdb7dead4ccadcf79c6f56ccf3b6edf1faf",
+      "sourceSha256": "002b7c0a93979b38122c1f15eea68fdb7dead4ccadcf79c6f56ccf3b6edf1faf",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClassInjectorTests_ci.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/ClassInjectorTests_ci.toml",
       "sha256": "6d04e5fc5e42097f8852cf9ca402e3411f2a871b13b3733fda7bda79601f590f",
+      "sourceSha256": "6d04e5fc5e42097f8852cf9ca402e3411f2a871b13b3733fda7bda79601f590f",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClassInjectorTypes.cpp": {
-      "sha256": "49d2a4a71237f69f016763125d6ea0798a44062f74d3ee71fecc8edaf8cf618b",
+      "sourcePath": "plugins/ClassInjector/tests/ClassInjectorTypes.cpp",
+      "sha256": "dadcb98a4dd85216da6d18c218137b438cfff77facf92a418d13f80520f494ff",
+      "sourceSha256": "dadcb98a4dd85216da6d18c218137b438cfff77facf92a418d13f80520f494ff",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClosedBootstrap.cpp": {
+      "sourcePath": "plugins/ClassInjector/tests/ClosedBootstrap.cpp",
       "sha256": "017febc11901b1736abd7faa35577989dfc12dbe0b43c705330ad7c1b259a965",
+      "sourceSha256": "017febc11901b1736abd7faa35577989dfc12dbe0b43c705330ad7c1b259a965",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClosedTypes.cpp": {
-      "sha256": "c12f5b6be113ddaf10266966f49db9c5868b2c61b991f36145e0b1894658da14",
+      "sourcePath": "plugins/ClassInjector/tests/ClosedTypes.cpp",
+      "sha256": "1e3db35ab4b673becb60eab3305a6f77b0f635a78070ca75ef41215b19a38cfe",
+      "sourceSha256": "1e3db35ab4b673becb60eab3305a6f77b0f635a78070ca75ef41215b19a38cfe",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClosedTypes_ci.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/ClosedTypes_ci.toml",
       "sha256": "4a3da4f69090843fe72092ed4ff3053b68952cf7f4365a6465b096c38e09c206",
+      "sourceSha256": "4a3da4f69090843fe72092ed4ff3053b68952cf7f4365a6465b096c38e09c206",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ConstructorTypes.cpp": {
-      "sha256": "852f47a91bf7187ef49ae3ec529495fc9c550e55c06c3153f02d1a3a26158c6c",
+      "sourcePath": "plugins/ClassInjector/tests/ConstructorTypes.cpp",
+      "sha256": "e392df00d5f82525ea08941f446f6215354e5a9a371e6a4b22c3e67a688ffac4",
+      "sourceSha256": "e392df00d5f82525ea08941f446f6215354e5a9a371e6a4b22c3e67a688ffac4",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ConstructorTypes.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/ConstructorTypes.toml",
       "sha256": "a131380d52f98904849b2d8be97c8b9dbd32d3240e0a547e3a2ef8f9ec681dc6",
+      "sourceSha256": "a131380d52f98904849b2d8be97c8b9dbd32d3240e0a547e3a2ef8f9ec681dc6",
       "adapted": false
     },
     "plugins/ClassInjector/tests/Diagnostics.cpp": {
-      "sha256": "519f2514496812d0818926e7bf6e2fff4fd8a485b66b5d6357be6d6add684e45",
+      "sourcePath": "plugins/ClassInjector/tests/Diagnostics.cpp",
+      "sha256": "f7b1a0f865d8f877b405220e7c6688a35d7baafe864c54ddd82e2abd2fb9f378",
+      "sourceSha256": "f7b1a0f865d8f877b405220e7c6688a35d7baafe864c54ddd82e2abd2fb9f378",
       "adapted": false
     },
     "plugins/ClassInjector/tests/Diagnostics.toml": {
-      "sha256": "4e9729804e0e357d73e32c221e16e6b27bf279bda299615a204876074c8b50e4",
+      "sourcePath": "plugins/ClassInjector/tests/Diagnostics.toml",
+      "sha256": "18d19bd2e20c159f5b77a636daa7d7adb7ab162f1692cc25695d0aeb44aa16a7",
+      "sourceSha256": "18d19bd2e20c159f5b77a636daa7d7adb7ab162f1692cc25695d0aeb44aa16a7",
       "adapted": false
     },
     "plugins/ClassInjector/tests/EnumMetadataTests.cpp": {
-      "sha256": "b3711e2de31bc3f6307f14af3eaf8fbbb1aeced6266548558442815f4316b675",
+      "sourcePath": "plugins/ClassInjector/tests/EnumMetadataTests.cpp",
+      "sha256": "cab303dfc7637abc6602d03afc7d9bf5353ee98d246f64f974832064ba4224aa",
+      "sourceSha256": "cab303dfc7637abc6602d03afc7d9bf5353ee98d246f64f974832064ba4224aa",
       "adapted": false
     },
     "plugins/ClassInjector/tests/EnumProbe.cpp": {
-      "sha256": "f4b294e2c2dc480dcb5e3e05c79cf66b9fd3b8afbfebe10442c666d23be55976",
+      "sourcePath": "plugins/ClassInjector/tests/EnumProbe.cpp",
+      "sha256": "54fb6f79b425cec001637bcc71decce81224effc451f469b39154469f10a74a2",
+      "sourceSha256": "54fb6f79b425cec001637bcc71decce81224effc451f469b39154469f10a74a2",
       "adapted": false
     },
     "plugins/ClassInjector/tests/EnumProbe.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/EnumProbe.toml",
       "sha256": "0e952c461a57538e0de5cf95b35f918b5711f0568ff4a8df9f211dda4e15ce4c",
+      "sourceSha256": "0e952c461a57538e0de5cf95b35f918b5711f0568ff4a8df9f211dda4e15ce4c",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FieldLayoutTests.cpp": {
-      "sha256": "9e816a304fae8df0eeb09b98d499773087b0a0ab4de01ca8f82b706bd5a51819",
+      "sourcePath": "plugins/ClassInjector/tests/FieldLayoutTests.cpp",
+      "sha256": "83f178e110ebe8f1af2d857c5a4328781b0c0b91ff9955590f3bc64a4a28855a",
+      "sourceSha256": "83f178e110ebe8f1af2d857c5a4328781b0c0b91ff9955590f3bc64a4a28855a",
       "adapted": false
     },
-    "plugins/ClassInjector/tests/final_fields.toml": {
-      "sha256": "6926cbd1d80a31f0b635ab29681dbbb7b6d6b6f2315286e250fb1510e91e967b",
+    "plugins/ClassInjector/tests/FinalPhaseProvider.cpp": {
+      "sourcePath": "plugins/ClassInjector/tests/FinalPhaseProvider.cpp",
+      "sha256": "e9f1288086be43313f85c7dc14b969493e36e3b50b1036ac3839acc062e69393",
+      "sourceSha256": "e9f1288086be43313f85c7dc14b969493e36e3b50b1036ac3839acc062e69393",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FiveArgumentTypes.cpp": {
-      "sha256": "492a26400bbfa628c15082549042772bb631a0c92691b02747eaa606c6ed8be5",
+      "sourcePath": "plugins/ClassInjector/tests/FiveArgumentTypes.cpp",
+      "sha256": "5c35c4049985b79ef8767dc4fcd51e58c6acc12ff97a39ee85e93225c8d60c3e",
+      "sourceSha256": "5c35c4049985b79ef8767dc4fcd51e58c6acc12ff97a39ee85e93225c8d60c3e",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FiveArgumentTypes.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/FiveArgumentTypes.toml",
       "sha256": "13f86f775627491aed492a86e17507e655bf5a8dbde895c8c813eb0e69fdc77a",
+      "sourceSha256": "13f86f775627491aed492a86e17507e655bf5a8dbde895c8c813eb0e69fdc77a",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FloatingReturnTypes.cpp": {
-      "sha256": "5545a6adbbb205e4c51f217eb89f57d3baddbe757c0d6f2f01a887a496bfa6eb",
+      "sourcePath": "plugins/ClassInjector/tests/FloatingReturnTypes.cpp",
+      "sha256": "08280aa405f362c7032f382023eca8690912eb01910b05229cb6036b09355ab5",
+      "sourceSha256": "08280aa405f362c7032f382023eca8690912eb01910b05229cb6036b09355ab5",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FloatingReturnTypes.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/FloatingReturnTypes.toml",
       "sha256": "1e417fe727305cb2b38a2584c8af078c443ee2e9bb1627b79c9a735af404b2cf",
+      "sourceSha256": "1e417fe727305cb2b38a2584c8af078c443ee2e9bb1627b79c9a735af404b2cf",
       "adapted": false
     },
     "plugins/ClassInjector/tests/IncompatibleProvider.cpp": {
-      "sha256": "bdf81f7a7609db6f03e8db458a0a13ba3ea4052b4f037a7594e45bda1466cd39",
+      "sourcePath": "plugins/ClassInjector/tests/IncompatibleProvider.cpp",
+      "sha256": "6a7b316a9657e8f56e487b245404f9d77f6fd8ca6ace66ee8d99ac7e86513a9c",
+      "sourceSha256": "6a7b316a9657e8f56e487b245404f9d77f6fd8ca6ace66ee8d99ac7e86513a9c",
       "adapted": false
     },
     "plugins/ClassInjector/tests/InterfaceTests_ci.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/InterfaceTests_ci.toml",
       "sha256": "4d5402910f6873f4eeb43bafd21ee3afc86de525db990e9c6a3718cd6770ac3c",
+      "sourceSha256": "4d5402910f6873f4eeb43bafd21ee3afc86de525db990e9c6a3718cd6770ac3c",
       "adapted": false
     },
     "plugins/ClassInjector/tests/InterfaceTypes.cpp": {
-      "sha256": "c0af1c2924296a76af80929caa1880bab35db1c584d2e80f7a8ce2ce7e9fec39",
+      "sourcePath": "plugins/ClassInjector/tests/InterfaceTypes.cpp",
+      "sha256": "b3567ce1ad75045daffb4e857d64a175c00c67a73e80b29fa31b58e470de3060",
+      "sourceSha256": "b3567ce1ad75045daffb4e857d64a175c00c67a73e80b29fa31b58e470de3060",
       "adapted": false
     },
     "plugins/ClassInjector/tests/InvokeSignatureTests.cpp": {
-      "sha256": "ec1b9986dfb7a21003ae55f509059488eb702ff570a84bef08c683322497458d",
+      "sourcePath": "plugins/ClassInjector/tests/InvokeSignatureTests.cpp",
+      "sha256": "02d9f7394351062d7985864ba2b39b8f089434566240c57752c8d708feb25b90",
+      "sourceSha256": "02d9f7394351062d7985864ba2b39b8f089434566240c57752c8d708feb25b90",
       "adapted": false
     },
     "plugins/ClassInjector/tests/InvokeSignatureTypes.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/InvokeSignatureTypes.toml",
       "sha256": "3258a6834dfba6c242b6fc8df81f588f9ad400c6e3d0dfe46a6e23dcd6150dcf",
-      "adapted": false
-    },
-    "plugins/ClassInjector/tests/leaf_fields.toml": {
-      "sha256": "8cdf7f9962a0cdc8f87b14639813e119c602c64275aae1a2a904d996452cdd54",
+      "sourceSha256": "3258a6834dfba6c242b6fc8df81f588f9ad400c6e3d0dfe46a6e23dcd6150dcf",
       "adapted": false
     },
     "plugins/ClassInjector/tests/MetadataTests.cpp": {
-      "sha256": "a2f658ee94a5eee1531dd47be1ab332c89e5cb0967a8487a7593ff927905e402",
+      "sourcePath": "plugins/ClassInjector/tests/MetadataTests.cpp",
+      "sha256": "1007ad17e8a4cd70d52444b713bcc11e5c9b177e1ed301f345a4ea54071dbf85",
+      "sourceSha256": "1007ad17e8a4cd70d52444b713bcc11e5c9b177e1ed301f345a4ea54071dbf85",
       "adapted": false
     },
     "plugins/ClassInjector/tests/NativeCallProbe.h": {
+      "sourcePath": "plugins/ClassInjector/tests/NativeCallProbe.h",
       "sha256": "5e5adb1dfb88b3959f21020495ac758f192a21525b4f54c7332046e4c08a56ed",
+      "sourceSha256": "5e5adb1dfb88b3959f21020495ac758f192a21525b4f54c7332046e4c08a56ed",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ProviderAbiTests.cpp": {
-      "sha256": "17b7a2a1c7c8fdb0880590e28163f92d5d588e7f01ba3de17166b81e99668a2e",
+      "sourcePath": "plugins/ClassInjector/tests/ProviderAbiTests.cpp",
+      "sha256": "eb9f1bf1302ab6049f51df09c3207bdb6a4b43274890cb704a78c97961a42115",
+      "sourceSha256": "eb9f1bf1302ab6049f51df09c3207bdb6a4b43274890cb704a78c97961a42115",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ProviderBootstrap.cpp": {
+      "sourcePath": "plugins/ClassInjector/tests/ProviderBootstrap.cpp",
       "sha256": "c67b424aaa13f417dc613ad3763eef024e1fa21defbba46e63f7d7f618429225",
+      "sourceSha256": "c67b424aaa13f417dc613ad3763eef024e1fa21defbba46e63f7d7f618429225",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/ProviderSDKTests.cpp": {
+      "sourcePath": "plugins/ClassInjector/tests/ProviderSDKTests.cpp",
+      "sha256": "73a131655ef52b7a68f3dad9963dc7ab55aeca7f867b89640cb5a90e3c53293f",
+      "sourceSha256": "73a131655ef52b7a68f3dad9963dc7ab55aeca7f867b89640cb5a90e3c53293f",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/ProviderTestAccess.h": {
+      "sourcePath": "plugins/ClassInjector/tests/ProviderTestAccess.h",
+      "sha256": "8cf51742a603d3ac5b71d07764b31b2bf8d24aa2793ab4ef6a20147910dc130c",
+      "sourceSha256": "8cf51742a603d3ac5b71d07764b31b2bf8d24aa2793ab4ef6a20147910dc130c",
       "adapted": false
     },
     "plugins/ClassInjector/tests/RefParameterProbe.cpp": {
-      "sha256": "e15c27cdb18d9c0aa1f7bac78a95ca1a4e284cd501b831d68678e6b2ca8f885e",
+      "sourcePath": "plugins/ClassInjector/tests/RefParameterProbe.cpp",
+      "sha256": "f28c246f5a59e57d83fac537dd35be55950e8e59cb532a1bf61d7bdf5f727d58",
+      "sourceSha256": "f28c246f5a59e57d83fac537dd35be55950e8e59cb532a1bf61d7bdf5f727d58",
       "adapted": false
     },
     "plugins/ClassInjector/tests/RszProbe.cpp": {
+      "sourcePath": "plugins/ClassInjector/tests/RszProbe.cpp",
       "sha256": "4105e4f5ce8e2848a64c0861bb61265287b57e65b586f4707db16fc83bd3bcb5",
+      "sourceSha256": "4105e4f5ce8e2848a64c0861bb61265287b57e65b586f4707db16fc83bd3bcb5",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/audit_runtime_types.py": {
+      "sourcePath": "plugins/ClassInjector/tests/audit_runtime_types.py",
+      "sha256": "c7c3b36343d7824ff59b1397a5c3f07abedabcffaf052874443d80d6859626b1",
+      "sourceSha256": "c7c3b36343d7824ff59b1397a5c3f07abedabcffaf052874443d80d6859626b1",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/capture_tdb.py": {
+      "sourcePath": "plugins/ClassInjector/tests/capture_tdb.py",
+      "sha256": "4ddd569084c7510ce4df4508aa8e917fdd141c6f4cb5893e2bc9c8d497cd5fa9",
+      "sourceSha256": "4ddd569084c7510ce4df4508aa8e917fdd141c6f4cb5893e2bc9c8d497cd5fa9",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/final_fields.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/final_fields.toml",
+      "sha256": "6926cbd1d80a31f0b635ab29681dbbb7b6d6b6f2315286e250fb1510e91e967b",
+      "sourceSha256": "6926cbd1d80a31f0b635ab29681dbbb7b6d6b6f2315286e250fb1510e91e967b",
+      "adapted": false
+    },
+    "plugins/ClassInjector/tests/leaf_fields.toml": {
+      "sourcePath": "plugins/ClassInjector/tests/leaf_fields.toml",
+      "sha256": "8cdf7f9962a0cdc8f87b14639813e119c602c64275aae1a2a904d996452cdd54",
+      "sourceSha256": "8cdf7f9962a0cdc8f87b14639813e119c602c64275aae1a2a904d996452cdd54",
       "adapted": false
     },
     "plugins/ClassInjector/tests/test_capture_tdb.py": {
+      "sourcePath": "plugins/ClassInjector/tests/test_capture_tdb.py",
       "sha256": "4c9e2d4c098a4ecb15e9620d39754faf1cef3b4592c671d8a2a01e51f70f75f3",
+      "sourceSha256": "4c9e2d4c098a4ecb15e9620d39754faf1cef3b4592c671d8a2a01e51f70f75f3",
       "adapted": false
+    },
+    "plugins/HIDWrapper/CMakeLists.txt": {
+      "sourcePath": "plugins/HIDWrapper/CMakeLists.txt",
+      "sha256": "4d76e4b96ad5a7d6b42d65dbd6afc34a9918880f942b2176ff4b7546ca159617",
+      "sourceSha256": "a3204730bd58012626df5106d4315a48d7f360943556cad0d4c99e4593e1b4c2",
+      "adapted": true
+    },
+    "plugins/HIDWrapper/hid.asm": {
+      "sourcePath": "plugins/HIDWrapper/hid.asm",
+      "sha256": "b2505293692c0507566e5f2b8003ce957d454e7df60e5879472ced21e008ecc9",
+      "sourceSha256": "b2505293692c0507566e5f2b8003ce957d454e7df60e5879472ced21e008ecc9",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/hid.def": {
+      "sourcePath": "plugins/HIDWrapper/hid.def",
+      "sha256": "e951bdda7a2c2dca2b1998ed0224e8c797a83f86f078504ccfc1cfdf3cc817b6",
+      "sourceSha256": "e951bdda7a2c2dca2b1998ed0224e8c797a83f86f078504ccfc1cfdf3cc817b6",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/src/HIDExports.inc": {
+      "sourcePath": "plugins/HIDWrapper/src/HIDExports.inc",
+      "sha256": "67812b54d5b81defe349d0827ec32ec25ae80ca1418d69ac6487476fa071f892",
+      "sourceSha256": "67812b54d5b81defe349d0827ec32ec25ae80ca1418d69ac6487476fa071f892",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/src/hid.cpp": {
+      "sourcePath": "plugins/HIDWrapper/src/hid.cpp",
+      "sha256": "87b62fade7dd8b9eac5b699f1f71e8e695028e5febd581e4ccb51b52ef2939aa",
+      "sourceSha256": "87b62fade7dd8b9eac5b699f1f71e8e695028e5febd581e4ccb51b52ef2939aa",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/tests/HIDWrapperTests.cpp": {
+      "sourcePath": "plugins/HIDWrapper/tests/HIDWrapperTests.cpp",
+      "sha256": "2d8d9429ef5249de88dda43b38924311514b27457c6807c6d2c7cbc0f5145530",
+      "sourceSha256": "2d8d9429ef5249de88dda43b38924311514b27457c6807c6d2c7cbc0f5145530",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/tests/test_hid_deployment.py": {
+      "sourcePath": "plugins/HIDWrapper/tests/test_hid_deployment.py",
+      "sha256": "8c3b681556724ef9585b47c41928499594e2ba78f23f2d36e8d8c9e0f0f8c328",
+      "sourceSha256": "8c3b681556724ef9585b47c41928499594e2ba78f23f2d36e8d8c9e0f0f8c328",
+      "adapted": false
+    },
+    "plugins/HIDWrapper/tools/deploy_hid.ps1": {
+      "sourcePath": "plugins/HIDWrapper/tools/deploy_hid.ps1",
+      "sha256": "df804194786169e6f58a6e9e28ec135e142a986688172b3a017308df9e8180f1",
+      "sourceSha256": "667801b70e29ae312c4b4193b2a12a34e459098c5c2bba40a0aca5d3dbea5359",
+      "adapted": true
+    },
+    "plugins/HIDWrapper/tools/remove_standalone_injector.ps1": {
+      "sourcePath": "plugins/HIDWrapper/tools/remove_standalone_injector.ps1",
+      "sha256": "b2c80025ecf144dcac7c2cbe55d415370ab5aa0ee064e0130aa2427cff46e616",
+      "sourceSha256": "c56f2f4fab71cc021a0f1b24603f60f6e3d731332fcca927b1773bf6e7c23fdc",
+      "adapted": true
     }
   },
-  "hashNormalization": "CRLF to LF"
+  "hashNormalization": "CRLF to LF",
+  "adaptations": [
+    "Root README navigation and repository-local/cross-repository links",
+    "Standalone build entry, deployment disabled by default and explicit deployment paths"
+  ],
+  "publicationFiles": {
+    "CMakeLists.txt": "cb36988aef6a2c8a6010b8480c88937933fc6346212b1cfdfd66ece362dc20af",
+    "BUILDING.md": "986f994b5269228f24788466c6f3a6edb3ffaf70c73667b20b240b6b66f78b97",
+    "vcpkg.json": "fb377973597a40c2d6a651ff3ce842f24a337e2d717211aa9d6ab09b0b5a5b9b",
+    ".gitmodules": "b1dea08badb26519f1cbe46cec6b0ca676dd6c45271bb4ecc972aa35b0eb6e73"
+  }
 }
