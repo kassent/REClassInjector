@@ -94,7 +94,7 @@ name="Tests.Color"
 renames=[{fromName="Zero",to="Nil"}]
 appends=[{name="Negative",value=-7},{name="Min",value=-2147483648},{name="Max",value=2147483647},{name="Alias",value=0}]
 )", "enum-tests.toml");
-    auto database = ci::BuildTypeDatabase(fixture.header, declarations);
+    auto database = ci::BuildTDB(fixture.header, declarations);
     auto& type = database->types[4];
     Check(database->types.size() == fixture.types.size() && type.arrayTypeIndex == 5 && type.instanceSize == 20, "enum/array identity and layout");
     Check(database->typeImpls[type.implIndex].numMemberFields == 7, "new member count");
@@ -111,7 +111,7 @@ appends=[{name="Negative",value=-7},{name="Min",value=-2147483648},{name="Max",v
     Check(target.initData == database->initializers.data() && target.numInitData == 7, "initializer publication");
     Check(target.numTypes == fixture.header.numTypes, "no new types");
     auto Reject = [&](const std::vector<ci::CustomTypeConfig>& specs) {
-        try { ci::BuildTypeDatabase(fixture.header, specs); } catch (const std::exception&) { return; }
+        try { ci::BuildTDB(fixture.header, specs); } catch (const std::exception&) { return; }
         throw std::runtime_error("invalid declaration was accepted");
     };
     auto bad = declarations; bad[0].enumExtension->renames[0].source = "Missing"; Reject(bad);
@@ -124,14 +124,14 @@ appends=[{name="Negative",value=-7},{name="Min",value=-2147483648},{name="Max",v
     auto renameOnly = declarations;
     renameOnly[0].enumExtension->appends.clear();
     auto incomplete = fixture.header; incomplete.initData = nullptr;
-    auto renamed = ci::BuildTypeDatabase(incomplete, renameOnly);
+    auto renamed = ci::BuildTDB(incomplete, renameOnly);
     Check(renamed->initializers.empty(), "rename-only must not copy initializer data");
     auto& renamedField = renamed->fields[renamed->types[4].memberFieldIndex + 1];
     auto& renamedImpl = renamed->fieldImpls[renamedField.impl];
     Check(renamedField.initHi == fixture.fields[1].initHi && renamedImpl.initMid == fixture.fieldImpls[1].initMid && renamedImpl.initLo == fixture.fieldImpls[1].initLo, "rename preserves the exact constant index");
     auto boundary = declarations; boundary[0].enumExtension->renames.clear(); boundary[0].enumExtension->appends.resize(1);
     fixture.initializers.resize(65535); fixture.Refresh();
-    auto edge = ci::BuildTypeDatabase(fixture.header, boundary);
+    auto edge = ci::BuildTDB(fixture.header, boundary);
     auto& last = edge->fields.back(); auto& lastImpl = edge->fieldImpls[last.impl];
     Check(last.initHi == 63 && lastImpl.initMid == 15 && lastImpl.initLo == 63 && edge->initializers.size() == 65536, "last 16-bit initializer index");
     fixture.initializers.resize(65536); fixture.Refresh(); Reject(boundary);
@@ -152,7 +152,7 @@ static void TestReviewRegressions() {
     const std::string renameText = "schema_version=1\n[[enums]]\nname='Tests.Color'\nrenames=[{fromName='Zero',to='Nil'}]";
     auto renames = ci::ParseCustomTypeConfig(renameText, "rename-only.toml");
     Check(!renames[0].extend && renames[0].IsTypeExtension(), "enum operations do not duplicate the class extension flag");
-    auto renamed = ci::BuildTypeDatabase(fixture.header, renames);
+    auto renamed = ci::BuildTDB(fixture.header, renames);
     auto published = fixture.header;
     renamed->Publish(published);
     Check(published.initData == fixture.header.initData && published.numInitData == fixture.header.numInitData, "rename-only publication must preserve the original initializer table");
@@ -189,7 +189,7 @@ static void TestReviewRegressions() {
         rejected = false;
         try {
             auto specs = ci::ParseCustomTypeConfig(std::string("schema_version=1\n[[enums]]\nname='Tests.Color'\n") + operation, "nul-name.toml");
-            ci::BuildTypeDatabase(fixture.header, specs);
+            ci::BuildTDB(fixture.header, specs);
         } catch (const std::exception&) { rejected = true; }
         Check(rejected, "enum names containing NUL must be rejected");
     }
@@ -201,25 +201,25 @@ static void TestReviewRegressions() {
     auto nearLimit = fixture.header;
     nearLimit.fieldImpls = crowded.data();
     nearLimit.numFieldImpl = uint32_t(crowded.size());
-    auto edge = ci::BuildTypeDatabase(nearLimit, renames);
+    auto edge = ci::BuildTDB(nearLimit, renames);
     Check(edge->fields.size() == fixture.fields.size() + 3 && edge->fieldImpls.size() == FIELD_IMPL_LIMIT - 1, "reserve FieldDef and FieldImpl by their separate increments");
 
     auto chain = renames;
     chain[0].enumExtension->renames = {{.source = "Zero", .to = "First"}, {.source = "First", .to = "Second"}, {.source = "Second", .to = "Third"}, {.source = "Third", .to = "Last"}};
-    auto chained = ci::BuildTypeDatabase(fixture.header, chain);
+    auto chained = ci::BuildTDB(fixture.header, chain);
     Check(chained->fieldImpls.size() == fixture.fieldImpls.size() + 4, "count every chained rename implementation");
     rejected = false;
-    try { ci::BuildTypeDatabase(nearLimit, chain); }
+    try { ci::BuildTDB(nearLimit, chain); }
     catch (const std::exception&) { rejected = true; }
     Check(rejected, "rename implementations must respect their own packed limit");
 
     auto unchanged = renames;
     unchanged[0].enumExtension->renames[0].to = "Zero";
-    auto noOp = ci::BuildTypeDatabase(nearLimit, unchanged);
+    auto noOp = ci::BuildTDB(nearLimit, unchanged);
     Check(noOp->fieldImpls.size() == crowded.size() && noOp->strings == fixture.strings, "same-name rename must not allocate a string or implementation");
     unchanged[0].enumExtension->renames[0] = {.source = "Missing", .to = "Missing"};
     rejected = false;
-    try { ci::BuildTypeDatabase(fixture.header, unchanged); }
+    try { ci::BuildTDB(fixture.header, unchanged); }
     catch (const std::exception& error) {
         const std::string_view message(error.what());
         rejected = message.contains("rename-only.toml") && message.contains("Tests.Color") && message.contains("Missing");
@@ -234,13 +234,13 @@ static void TestNoOpStorage() {
     ci::CustomTypeConfig unchanged{.name = "Tests.Color", .enumExtension = ci::EnumExtensionSpec{}};
     for (bool byValue : {false, true}) {
         unchanged.enumExtension->renames = {{.source = byValue ? std::variant<std::string, int32_t>{0} : std::variant<std::string, int32_t>{"Zero"}, .to = "Zero"}};
-        auto database = ci::BuildTypeDatabase(fixture.header, {unchanged, unchanged});
+        auto database = ci::BuildTDB(fixture.header, {unchanged, unchanged});
         Check(database->fields.size() == fixture.fields.size() && database->typeImpls.size() == fixture.impls.size(), "repeated no-op must not copy member or type implementation blocks");
         Check(database->types[4].memberFieldIndex == fixture.types[4].memberFieldIndex && database->types[4].implIndex == fixture.types[4].implIndex, "no-op must retain original member/implementation indices");
         Check(database->fieldImpls.size() == fixture.fieldImpls.size() && database->strings == fixture.strings && database->bytes == fixture.bytes && database->initializers.empty(), "no-op must not append records, names or initializer data");
     }
     unchanged.enumExtension->renames.clear();
-    auto empty = ci::BuildTypeDatabase(fixture.header, {unchanged});
+    auto empty = ci::BuildTDB(fixture.header, {unchanged});
     Check(empty->fields.size() == fixture.fields.size() && empty->typeImpls.size() == fixture.impls.size(), "empty provider extension must not allocate metadata");
 
     // 两张复制表各只剩不到一个成员块/实现的容量，no-op 不应被虚增预留拒绝。
@@ -252,7 +252,7 @@ static void TestNoOpStorage() {
     crowded.fields = fields.data(); crowded.numFields = uint32_t(fields.size());
     crowded.typeImpls = implementations.data(); crowded.numTypeImpl = uint32_t(implementations.size());
     unchanged.enumExtension->renames = {{.source = "Zero", .to = "Zero"}};
-    auto edge = ci::BuildTypeDatabase(crowded, {unchanged});
+    auto edge = ci::BuildTDB(crowded, {unchanged});
     Check(edge->fields.size() == fields.size() && edge->typeImpls.size() == implementations.size(), "no-op must reserve zero FieldDef and TypeImpl records at packed limits");
 
     auto changed = unchanged;
@@ -260,19 +260,19 @@ static void TestNoOpStorage() {
     changed.enumExtension->appends.push_back({.name = "Added", .value = -7});
     auto tail = unchanged;
     tail.enumExtension->renames = {{.source = "Renamed", .to = "Renamed"}, {.source = int32_t(-7), .to = "Added"}};
-    auto mixed = ci::BuildTypeDatabase(fixture.header, {unchanged, changed, tail});
+    auto mixed = ci::BuildTDB(fixture.header, {unchanged, changed, tail});
     Check(mixed->fields.size() == fixture.fields.size() + 4 && mixed->typeImpls.size() == fixture.impls.size() + 1, "no-ops around real changes must copy exactly one member block and implementation");
     for (const char* source : {"Missing", "value__"}) {
         unchanged.enumExtension->renames = {{.source = source, .to = source}};
         bool rejected = false;
-        try { ci::BuildTypeDatabase(fixture.header, {unchanged}); }
+        try { ci::BuildTDB(fixture.header, {unchanged}); }
         catch (const std::exception&) { rejected = true; }
         Check(rejected, "no-op still validates existing non-reserved source");
     }
     unchanged.name = "System.Int32";
     unchanged.enumExtension->renames.clear();
     bool rejected = false;
-    try { ci::BuildTypeDatabase(fixture.header, {unchanged}); }
+    try { ci::BuildTDB(fixture.header, {unchanged}); }
     catch (const std::exception&) { rejected = true; }
     Check(rejected, "empty operation must still target an existing Int32 enum");
     std::cout << "PASS: enum no-op zero writes, exact member/type capacities, ordered mixed edits and source validation\n";
@@ -304,7 +304,7 @@ renames=[{fromValue=0,to='Canonical'}, {fromName='Canonical',to='Interim'},
     specs.push_back(values[0]);
     auto tail = ci::ParseCustomTypeConfig("schema_version=1\n[[enums]]\nname='Tests.Color'\nrenames=[{fromName='Canonical',to='Final'}]", "after-value.toml");
     specs.push_back(tail[0]);
-    auto database = ci::BuildTypeDatabase(fixture.header, specs);
+    auto database = ci::BuildTDB(fixture.header, specs);
     Check(Name(*database, 1) == "Final" && Name(*database, 2) == "FromStringPool" && Name(*database, 3) == "Alias", "source order, signed pool and canonical alias selection");
     const std::array<int32_t, 6> expected{0, 1, 0, -7, INT32_MIN, INT32_MAX};
     for (uint32_t i = 0; i < expected.size(); ++i) Check(Value(*database, database->fields[database->types[4].memberFieldIndex + i + 1]) == expected[i], "value-selected rename changed a constant");
@@ -312,7 +312,7 @@ renames=[{fromValue=0,to='Canonical'}, {fromName='Canonical',to='Interim'},
     Check(std::string_view(database->strings.data() + database->fieldImpls[database->fields[4].impl].name) == "Zero", "value-selected rename modified shared impl");
 
     auto single = ByValue(0, "Renamed");
-    auto renamed = ci::BuildTypeDatabase(fixture.header, {single});
+    auto renamed = ci::BuildTDB(fixture.header, {single});
     auto published = fixture.header;
     renamed->Publish(published);
     Check(Name(*renamed, 1) == "Renamed" && renamed->initializers.empty() && published.initData == fixture.header.initData && published.numInitData == fixture.header.numInitData, "value-selected rename must read but not copy/publish the constant table");
@@ -322,13 +322,13 @@ renames=[{fromValue=0,to='Canonical'}, {fromName='Canonical',to='Interim'},
     const int32_t negative = -7, minimum = INT32_MIN;
     std::memcpy(signedFixture.bytes.data() + 4, &negative, sizeof(negative));
     std::memcpy(signedFixture.strings.data() - int64_t(signedFixture.initializers[2]), &minimum, sizeof(minimum));
-    auto signedOriginal = ci::BuildTypeDatabase(signedFixture.header, {ByValue(negative, "ByteNegative"), ByValue(minimum, "StringMinimum")});
+    auto signedOriginal = ci::BuildTDB(signedFixture.header, {ByValue(negative, "ByteNegative"), ByValue(minimum, "StringMinimum")});
     Check(Name(*signedOriginal, 1) == "ByteNegative" && Name(*signedOriginal, 2) == "StringMinimum", "original negative/Int32 minimum constants from both pools");
     Fixture packedFixture;
     constexpr uint32_t PACKED_INDEX = (1u << 10) | (2u << 6) | 9;
     packedFixture.fields[1].initHi = 1; packedFixture.fieldImpls[1].initMid = 2; packedFixture.fieldImpls[1].initLo = 9;
     packedFixture.initializers.resize(PACKED_INDEX + 1); packedFixture.initializers[PACKED_INDEX] = 4; packedFixture.Refresh();
-    auto packed = ci::BuildTypeDatabase(packedFixture.header, {single});
+    auto packed = ci::BuildTDB(packedFixture.header, {single});
     Check(Name(*packed, 1) == "Renamed", "value selection must decode all three packed initializer slices");
 
     // 按值的no-op必须先归一，避免预检把无新增impl的操作误算为容量溢出。
@@ -337,11 +337,11 @@ renames=[{fromValue=0,to='Canonical'}, {fromName='Canonical',to='Interim'},
     crowded.resize(FIELD_IMPL_LIMIT - 1);
     auto nearLimit = fixture.header;
     nearLimit.fieldImpls = crowded.data(); nearLimit.numFieldImpl = uint32_t(crowded.size());
-    auto noOp = ci::BuildTypeDatabase(nearLimit, {ByValue(0, "Zero")});
+    auto noOp = ci::BuildTDB(nearLimit, {ByValue(0, "Zero")});
     Check(noOp->fieldImpls.size() == crowded.size() && noOp->strings == fixture.strings, "value-selected no-op must allocate neither name nor impl");
 
     auto Reject = [&](const RE::TDB& input, const std::vector<ci::CustomTypeConfig>& declarations) {
-        try { ci::BuildTypeDatabase(input, declarations); } catch (const std::exception&) { return; }
+        try { ci::BuildTDB(input, declarations); } catch (const std::exception&) { return; }
         throw std::runtime_error("invalid value-selected rename was accepted");
     };
     Reject(fixture.header, {ByValue(9, "Missing")});

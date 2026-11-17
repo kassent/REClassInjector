@@ -189,11 +189,7 @@ bool InvokeGeneratedMethod(InvokeFrame* frame, void* context) {
 }
 
 bool InstallInvokeDispatch(TypeDatabase& database, void* initializeRuntimeEntries) {
-    DWORD64 imageBase{};
-    auto* unwind = RtlLookupFunctionEntry(uintptr_t(initializeRuntimeEntries), &imageBase, nullptr);
-    if (!unwind) return false;
-    const auto size = uint32_t(imageBase + unwind->EndAddress - uintptr_t(initializeRuntimeEntries));
-    const auto registration = HookUtils::LookupFunctionPattern(initializeRuntimeEntries, "48 8D 15 ? ? ? ? 48 89 F1 41 B8 ? ? ? ? E8 ? ? ? ?", size);
+    const auto registration = HookUtils::LookupFunctionPattern(initializeRuntimeEntries, "48 8D 15 ? ? ? ? 48 89 F1 41 B8 ? ? ? ? E8 ? ? ? ?");
     if (!registration) {
         _MESSAGE("Invoke dispatch FAILED: native table registration not found");
         return false;

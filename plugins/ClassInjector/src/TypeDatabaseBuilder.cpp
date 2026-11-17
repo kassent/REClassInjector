@@ -14,7 +14,7 @@
 
 // 元数据层：在 TypeDatabase 自有存储中复制原表、追加 class 形状，再由 TypeInjection 在启动窗口发布。
 // 不自行分配 TypeInfo / ObjectInfo，也不生成任意泛型 AOT 代码；这些运行时对象仍由原 builder 创建。
-// 读代码主线：BuildTypeDatabase -> CopyTypeDatabase -> ExpandGenericTemplates -> OrderTypeDeclarations
+// 读代码主线：BuildTDB -> CopyTypeDatabase -> ExpandGenericTemplates -> OrderTypeDeclarations
 //            -> ReserveTypeDatabase -> BuildClass(Fields / Methods / Interfaces) -> RebaseReferenceBitmaps -> Publish。
 namespace ci {
 
@@ -411,7 +411,7 @@ namespace ci {
     }
 
     // 构建未发布的完整 TypeDatabase；失败时原 TDB 不变，TypeInjection 只在 binding 也准备完毕后调用 Publish。
-    std::unique_ptr<TypeDatabase> BuildTypeDatabase(const RE::TDB& original, std::vector<CustomTypeConfig> declarations) {
+    std::unique_ptr<TypeDatabase> BuildTDB(const RE::TDB& original, std::vector<CustomTypeConfig> declarations) {
         std::vector<CustomTypeBuildSpec> specs;
         specs.reserve(declarations.size());
         for (auto& declaration : std::exchange(declarations, {})) specs.push_back({std::move(declaration)});

@@ -64,7 +64,7 @@ namespace HIDWrapper {
         (void)g_createWindowExWHook.disable();
         _MESSAGE("CreateWindowEx from EXE: caller=%p, uptime=%llu ms", caller, GetTickCount64());
         // 只触发一次核心安装；安装失败由核心统一记录，类型发布仍归真实 VM 初始化。
-        _MESSAGE("Type injection hooks ready=%d", ci::InstallTypeInjectionHooks());
+        _MESSAGE("Type injection hooks ready=%d", ci::TypeInjection::InstallHooks());
     }
 
     static HWND WINAPI CreateWindowExAHook(DWORD exStyle, LPCSTR className, LPCSTR windowName, DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance, LPVOID parameter) {

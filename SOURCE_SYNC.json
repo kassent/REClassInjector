@@ -1,11 +1,8 @@
 {
   "sourceRepository": "https://github.com/kassent/mhwilds",
-  "sourceCommit": "30bcbe1b8eaa29fa0a06cb0028ecdd1f64a8738a",
-  "sourceWorkingTreeChanges": {
-    "plugins/ClassInjector/DEVELOPER_GUIDE.en.md": "31b0273269901bd1fa5c6a9970a1596e292889aa7d3a7c2413919e8c8c905865",
-    "plugins/ClassInjector/DEVELOPER_GUIDE.md": "a591c09307714f424088131ba53f0e7cffcbab3f343cdcbcd3a6abb91a37d972"
-  },
-  "commonCommit": "e7f816cef21dbe7db5bd2cbb0173269aaaa49093",
+  "sourceCommit": "165b3421688e3c1311240b33db65c4da2816d0f8",
+  "sourceWorkingTreeChanges": {},
+  "commonCommit": "3caf9b19ed6325569798a42a8432917100ffff60",
   "sdkABI": 3,
   "files": {
     "README.md": {
@@ -76,8 +73,8 @@
     },
     "plugins/ClassInjector/include/ClassInjector.h": {
       "sourcePath": "plugins/ClassInjector/include/ClassInjector.h",
-      "sha256": "f744e407d4487c8a76c41f92a92d14069967e7b65d529a4e9934ae8e4bfc7309",
-      "sourceSha256": "f744e407d4487c8a76c41f92a92d14069967e7b65d529a4e9934ae8e4bfc7309",
+      "sha256": "71734639af90c51df6f263b17b7dbb1be23ec6c72c880fc62d9d9b089438654e",
+      "sourceSha256": "71734639af90c51df6f263b17b7dbb1be23ec6c72c880fc62d9d9b089438654e",
       "adapted": false
     },
     "plugins/ClassInjector/include/ci/API.h": {
@@ -142,14 +139,14 @@
     },
     "plugins/ClassInjector/src/ClassProviders.cpp": {
       "sourcePath": "plugins/ClassInjector/src/ClassProviders.cpp",
-      "sha256": "860c6d334b474f35d6cd1ade51984cab95301f73d2e487cc09ea3f89d4a4ae3c",
-      "sourceSha256": "860c6d334b474f35d6cd1ade51984cab95301f73d2e487cc09ea3f89d4a4ae3c",
+      "sha256": "3776f145fdaa717079df115ea087985a7f7df2bc299fdd8ecb71bd95ce730bef",
+      "sourceSha256": "3776f145fdaa717079df115ea087985a7f7df2bc299fdd8ecb71bd95ce730bef",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassProviders.h": {
       "sourcePath": "plugins/ClassInjector/src/ClassProviders.h",
-      "sha256": "f95ea54580013da920e278f6a6cdbc2c1a168fdb84ae17be6a5e93d38db8f02b",
-      "sourceSha256": "f95ea54580013da920e278f6a6cdbc2c1a168fdb84ae17be6a5e93d38db8f02b",
+      "sha256": "c9ec71056826ced4e35e38015d2a688aa53ee234e408113fb4223a0813625e22",
+      "sourceSha256": "c9ec71056826ced4e35e38015d2a688aa53ee234e408113fb4223a0813625e22",
       "adapted": false
     },
     "plugins/ClassInjector/src/ClassVirtualTable.cpp": {
@@ -202,8 +199,8 @@
     },
     "plugins/ClassInjector/src/InvokeAdapters.cpp": {
       "sourcePath": "plugins/ClassInjector/src/InvokeAdapters.cpp",
-      "sha256": "138dd3455e5e7ae4706112f6c180e963a015b31e7c1e792a59e6cd4812272bb9",
-      "sourceSha256": "138dd3455e5e7ae4706112f6c180e963a015b31e7c1e792a59e6cd4812272bb9",
+      "sha256": "10cbe68770a68496b74f7e42cd13a2f01a05059de08b96857adb452fdf6271cf",
+      "sourceSha256": "10cbe68770a68496b74f7e42cd13a2f01a05059de08b96857adb452fdf6271cf",
       "adapted": false
     },
     "plugins/ClassInjector/src/InvokeAdapters.h": {
@@ -214,8 +211,8 @@
     },
     "plugins/ClassInjector/src/MethodTrampolines.cpp": {
       "sourcePath": "plugins/ClassInjector/src/MethodTrampolines.cpp",
-      "sha256": "7074a0e52dfc14dcc4798d35352b2cf77ac8516e6b164cbe4fd4b7b4dd5385e3",
-      "sourceSha256": "7074a0e52dfc14dcc4798d35352b2cf77ac8516e6b164cbe4fd4b7b4dd5385e3",
+      "sha256": "3e3072873575206a3a17f83958cbe849ebb09c9625347a6d2559e955e6e03c19",
+      "sourceSha256": "3e3072873575206a3a17f83958cbe849ebb09c9625347a6d2559e955e6e03c19",
       "adapted": false
     },
     "plugins/ClassInjector/src/MethodTrampolines.h": {
@@ -280,14 +277,14 @@
     },
     "plugins/ClassInjector/src/TypeDatabaseBuilder.cpp": {
       "sourcePath": "plugins/ClassInjector/src/TypeDatabaseBuilder.cpp",
-      "sha256": "f633bcaa2048e554dd70e62603c12d139c565dc70bfa55b115e9763ca7b2248a",
-      "sourceSha256": "f633bcaa2048e554dd70e62603c12d139c565dc70bfa55b115e9763ca7b2248a",
+      "sha256": "15296603e95e96b556f38d836216e64d5abf441b741db310fbb52919e3221488",
+      "sourceSha256": "15296603e95e96b556f38d836216e64d5abf441b741db310fbb52919e3221488",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabaseBuilder.h": {
       "sourcePath": "plugins/ClassInjector/src/TypeDatabaseBuilder.h",
-      "sha256": "80de5dd30db2565991a167a2fa74fa203a9d126e24eba94080cc1a97f1b7d91d",
-      "sourceSha256": "80de5dd30db2565991a167a2fa74fa203a9d126e24eba94080cc1a97f1b7d91d",
+      "sha256": "992586410e61b271695f513f545d4bcfc380b08e5e1500f81c40235d232fb299",
+      "sourceSha256": "992586410e61b271695f513f545d4bcfc380b08e5e1500f81c40235d232fb299",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeDatabaseRecords.h": {
@@ -298,8 +295,8 @@
     },
     "plugins/ClassInjector/src/TypeInjection.cpp": {
       "sourcePath": "plugins/ClassInjector/src/TypeInjection.cpp",
-      "sha256": "4f6fad9555affe41d16c57f8466e10dde6a846d9d0294c4f7bc424fd2c871ff1",
-      "sourceSha256": "4f6fad9555affe41d16c57f8466e10dde6a846d9d0294c4f7bc424fd2c871ff1",
+      "sha256": "cee33c6e3981756654e3408d46b45656a0c4981636f2762a2abf41eb16832fd8",
+      "sourceSha256": "cee33c6e3981756654e3408d46b45656a0c4981636f2762a2abf41eb16832fd8",
       "adapted": false
     },
     "plugins/ClassInjector/src/TypeInjection.h": {
@@ -310,8 +307,8 @@
     },
     "plugins/ClassInjector/tests/ClassInjectorTestAccess.h": {
       "sourcePath": "plugins/ClassInjector/tests/ClassInjectorTestAccess.h",
-      "sha256": "002b7c0a93979b38122c1f15eea68fdb7dead4ccadcf79c6f56ccf3b6edf1faf",
-      "sourceSha256": "002b7c0a93979b38122c1f15eea68fdb7dead4ccadcf79c6f56ccf3b6edf1faf",
+      "sha256": "49318e6e53f8866cca7edb08ee66b4a3408ac1686614a288ee9c19a7488885a4",
+      "sourceSha256": "49318e6e53f8866cca7edb08ee66b4a3408ac1686614a288ee9c19a7488885a4",
       "adapted": false
     },
     "plugins/ClassInjector/tests/ClassInjectorTests_ci.toml": {
@@ -370,8 +367,8 @@
     },
     "plugins/ClassInjector/tests/EnumMetadataTests.cpp": {
       "sourcePath": "plugins/ClassInjector/tests/EnumMetadataTests.cpp",
-      "sha256": "cab303dfc7637abc6602d03afc7d9bf5353ee98d246f64f974832064ba4224aa",
-      "sourceSha256": "cab303dfc7637abc6602d03afc7d9bf5353ee98d246f64f974832064ba4224aa",
+      "sha256": "dd2676b89d2ec6275f631442daace9f0676220228a2931b090e27e05b5d9e607",
+      "sourceSha256": "dd2676b89d2ec6275f631442daace9f0676220228a2931b090e27e05b5d9e607",
       "adapted": false
     },
     "plugins/ClassInjector/tests/EnumProbe.cpp": {
@@ -388,8 +385,8 @@
     },
     "plugins/ClassInjector/tests/FieldLayoutTests.cpp": {
       "sourcePath": "plugins/ClassInjector/tests/FieldLayoutTests.cpp",
-      "sha256": "83f178e110ebe8f1af2d857c5a4328781b0c0b91ff9955590f3bc64a4a28855a",
-      "sourceSha256": "83f178e110ebe8f1af2d857c5a4328781b0c0b91ff9955590f3bc64a4a28855a",
+      "sha256": "5c966a7356489a55e03c390d35b9a5b782c53ce5a08c973abf2e711640fe37ce",
+      "sourceSha256": "5c966a7356489a55e03c390d35b9a5b782c53ce5a08c973abf2e711640fe37ce",
       "adapted": false
     },
     "plugins/ClassInjector/tests/FinalPhaseProvider.cpp": {
@@ -442,8 +439,8 @@
     },
     "plugins/ClassInjector/tests/InvokeSignatureTests.cpp": {
       "sourcePath": "plugins/ClassInjector/tests/InvokeSignatureTests.cpp",
-      "sha256": "02d9f7394351062d7985864ba2b39b8f089434566240c57752c8d708feb25b90",
-      "sourceSha256": "02d9f7394351062d7985864ba2b39b8f089434566240c57752c8d708feb25b90",
+      "sha256": "86999b5d564123d935f9095e66f9834fc0b96e8672431033d7f362fa160f18fd",
+      "sourceSha256": "86999b5d564123d935f9095e66f9834fc0b96e8672431033d7f362fa160f18fd",
       "adapted": false
     },
     "plugins/ClassInjector/tests/InvokeSignatureTypes.toml": {
@@ -454,8 +451,8 @@
     },
     "plugins/ClassInjector/tests/MetadataTests.cpp": {
       "sourcePath": "plugins/ClassInjector/tests/MetadataTests.cpp",
-      "sha256": "1007ad17e8a4cd70d52444b713bcc11e5c9b177e1ed301f345a4ea54071dbf85",
-      "sourceSha256": "1007ad17e8a4cd70d52444b713bcc11e5c9b177e1ed301f345a4ea54071dbf85",
+      "sha256": "901aba4714bf3d26187a5b8c23541d020702dec7ce96853bc300243caa94d30b",
+      "sourceSha256": "901aba4714bf3d26187a5b8c23541d020702dec7ce96853bc300243caa94d30b",
       "adapted": false
     },
     "plugins/ClassInjector/tests/NativeCallProbe.h": {
@@ -556,8 +553,8 @@
     },
     "plugins/HIDWrapper/src/hid.cpp": {
       "sourcePath": "plugins/HIDWrapper/src/hid.cpp",
-      "sha256": "87b62fade7dd8b9eac5b699f1f71e8e695028e5febd581e4ccb51b52ef2939aa",
-      "sourceSha256": "87b62fade7dd8b9eac5b699f1f71e8e695028e5febd581e4ccb51b52ef2939aa",
+      "sha256": "81308fa016bdcc7c3a9eaacb1d7dd0ec5a87800d1fec9f072b6fd2655f32892c",
+      "sourceSha256": "81308fa016bdcc7c3a9eaacb1d7dd0ec5a87800d1fec9f072b6fd2655f32892c",
       "adapted": false
     },
     "plugins/HIDWrapper/tests/HIDWrapperTests.cpp": {

@@ -241,7 +241,11 @@ namespace ci {
     }
 
     // 只收集顶层同名 TOML / DLL 对并按文件名排序；空标记文件也参与加载登记。
-    std::vector<CustomTypeConfig> LoadClassProviders(const std::vector<std::filesystem::path>& directories, std::vector<ClassProviderNotification>* callbacks) {
+    void LoadClassProviders(const std::vector<std::filesystem::path>& directories,
+                            std::vector<CustomTypeConfig>& typeConfigs,
+                            std::vector<ClassProviderNotification>& callbacks) {
+        typeConfigs.clear();
+        callbacks.clear();
         std::vector<std::filesystem::path> configPaths;
         for (const auto& directory : directories) {
             if (!std::filesystem::exists(directory)) {
@@ -270,7 +274,7 @@ namespace ci {
                 _MESSAGE("Plugin TOML skipped: %s: %s", configPath.string().c_str(), error.what());
             }
         }
-        return ResolveClassProviders(std::move(configs), callbacks);
+        typeConfigs = ResolveClassProviders(std::move(configs), &callbacks);
     }
 
     // Consume the callback list before entering provider code; no second notified flag is needed.

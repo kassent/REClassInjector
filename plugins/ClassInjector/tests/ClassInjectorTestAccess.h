@@ -24,8 +24,9 @@ namespace ci {
     std::vector<CustomTypeBuildSpec> OrderTypeDeclarations(std::vector<CustomTypeBuildSpec> declarations);
     bool InvokeGeneratedMethod(InvokeFrame* frame, void* context);
 
-    bool FinalizeRuntimeTypes();
-    bool CompleteRuntimeInitialization(std::vector<ClassProviderNotification>& callbacks);
-    bool InstallRuntimeInitializationCall(uintptr_t initializeRuntimeEntriesCall, void (*initializeRuntimeEntries)());
-    extern std::atomic_bool g_ready;
+    namespace TypeInjection {
+        bool OnVmTypeTablesBuilt();
+        bool OnVmMethodsRegistered();
+        extern std::atomic_bool g_ready;
+    } // namespace TypeInjection
 } // namespace ci

@@ -66,6 +66,10 @@ namespace ci {
     void CreateMethodTrampolines(TypeDatabase& database) {
         auto declarations = std::exchange(database.methodDeclarations, {});
         BranchTrampoline* entries = nullptr;
+        size_t usedBytes = 0;
+        size_t capacityBytes = 0;
+        size_t entryCount = 0;
+        size_t builtinCount = 0;
         for (size_t index = 0; index < declarations.size(); ++index) {
             const auto& declaration = declarations[index];
             auto& method = database.customMethods[index];
@@ -83,9 +87,16 @@ namespace ci {
                         throw std::runtime_error("near entry allocation failed");
                     }
                     entries = page.get();
+                    capacityBytes += entries->Remain();
                     database.methodTrampolines.push_back(std::move(page));
                 }
+                const auto remainingBytes = entries->Remain();
                 method.entry = CreateMethodTrampoline(database, method, declaration, *entries);
+                usedBytes += remainingBytes - entries->Remain();
+                ++entryCount;
+                if (declaration.kind == MethodKind::Constructor && declaration.binding.backend == Backend::Builtin) {
+                    ++builtinCount;
+                }
             } catch (const std::runtime_error& error) {
                 const auto owner = database.GetFullName(method.declaringType) + "." + declaration.name;
                 const auto location = declaration.providerSource
@@ -93,5 +104,8 @@ namespace ci {
                 throw std::runtime_error(location + ": " + error.what());
             }
         }
+        _MESSAGE("Method trampolines: methods=%zu, entries=%zu, builtin constructors=%zu, blocks=%zu, used=%zu bytes, capacity=%zu bytes, remaining=%zu bytes",
+                 declarations.size(), entryCount, builtinCount, database.methodTrampolines.size(),
+                 usedBytes, capacityBytes, capacityBytes - usedBytes);
     }
 } // namespace ci

@@ -23,6 +23,12 @@ using namespace CIProviderTestAccess;
 #include <thread>
 #include <tuple>
 
+// 本测试直接编译启动接入实现，以设置文件内原生入口并验证真实 CALL 桥。
+// 链接器无需从 ClassInjectorCore 再提取 TypeInjection.obj；生产入口保持 static。
+#include "../src/TypeInjection.cpp"
+
+#pragma section(".cihook", read, execute)
+
 void TestInvokeSignatures(const RE::TDB& header);
 
 namespace {
@@ -142,7 +148,7 @@ namespace {
         throwing.binding.address = reinterpret_cast<void*>(&ThrowFive);
         ci::CustomTypeConfig type{.name = "Tests.FiveArgumentInvoker", .methods = {generated, borrowed, throwing}};
         auto previous = std::move(ci::g_database);
-        ci::g_database = ci::BuildTypeDatabase(header, {type});
+        ci::g_database = ci::BuildTDB(header, {type});
         auto& database = *ci::g_database;
         database.encodingBase = uintptr_t(GetModuleHandleW(nullptr));
         ci::CreateMethodTrampolines(database);
@@ -186,8 +192,15 @@ namespace {
         auto valid = ci::ResolveClassProviders({basic, other});
         Check(valid.size() == 4 && valid[0].methods[0].binding.address, "valid independent plugin pairs");
         Check(basic.dllPath == std::filesystem::path(CI_TEST_PROVIDER), "same-name DLL beside manifest");
-        Check(ci::LoadClassProviders({basic.dllPath.parent_path(), other.dllPath.parent_path()}).size() == 4, "provider declarations are collected across directories");
-        Check(ci::LoadClassProviders({basic.dllPath.parent_path() / "absent", other.dllPath.parent_path()}).size() == 2, "missing directory does not skip other provider directories");
+        std::vector<ci::CustomTypeConfig> loadedTypes;
+        std::vector<ci::ClassProviderNotification> loadedCallbacks;
+        ci::LoadClassProviders({basic.dllPath.parent_path(), other.dllPath.parent_path()}, loadedTypes, loadedCallbacks);
+        Check(loadedTypes.size() == 4, "provider declarations are collected across directories");
+        ci::LoadClassProviders({basic.dllPath.parent_path() / "absent", other.dllPath.parent_path()}, loadedTypes, loadedCallbacks);
+        Check(loadedTypes.size() == 2, "missing directory does not skip other provider directories; results replace previous types");
+        loadedCallbacks.push_back({});
+        ci::LoadClassProviders({}, loadedTypes, loadedCallbacks);
+        Check(loadedTypes.empty() && loadedCallbacks.empty(), "empty provider scan clears both previous outputs");
         Check(basic.types[0].methods[1].parameters[0].type == "System.Int32", "separate parameter declaration");
 
         auto bad = basic;
@@ -227,13 +240,16 @@ namespace {
         auto file = directory / "Discovery.dll";
         auto marker = directory / "Discovery.toml";
         std::filesystem::copy_file(basic.dllPath, file, std::filesystem::copy_options::overwrite_existing);
-        Check(ci::LoadClassProviders({directory}).empty() && !GetModuleHandleW(file.c_str()), "DLL without TOML is not loaded");
+        ci::LoadClassProviders({directory}, loadedTypes, loadedCallbacks);
+        Check(loadedTypes.empty() && !GetModuleHandleW(file.c_str()), "DLL without TOML is not loaded");
         auto unmatched = directory / "Unmatched.toml";
         std::ofstream(unmatched) << "";
-        Check(ci::LoadClassProviders({directory}).empty() && !GetModuleHandleW(file.c_str()), "different-name TOML does not select DLL");
+        ci::LoadClassProviders({directory}, loadedTypes, loadedCallbacks);
+        Check(loadedTypes.empty() && !GetModuleHandleW(file.c_str()), "different-name TOML does not select DLL");
         for (auto text : {"", "not valid TOML [", "[plugin]\ndll = 'Missing.dll'\n"}) {
             { std::ofstream stream(marker); stream << text; }
-            Check(ci::LoadClassProviders({directory}).empty(), "marker-only provider has no type declarations");
+            ci::LoadClassProviders({directory}, loadedTypes, loadedCallbacks);
+            Check(loadedTypes.empty(), "marker-only provider has no type declarations");
             auto module = GetModuleHandleW(file.c_str());
             Check(module != nullptr, "same-name TOML selects provider regardless of content");
             FreeLibrary(module);
@@ -450,7 +466,7 @@ namespace {
             ci::MethodSpec method{.name = name, .kind = ci::MethodKind::Override, .returnType = "System.Int32"};
             std::vector<ci::CustomTypeConfig> specs{{.name = "Tests.AccessorBase", .methods = {method}},
                                              {.name = "Tests.AccessorDerived", .base = "Tests.AccessorBase", .methods = {method}}};
-            auto database = ci::BuildTypeDatabase(fixture.header, specs);
+            auto database = ci::BuildTDB(fixture.header, specs);
             for (auto& type : database->customTypes) {
                 auto* override = database->FindMethod(type.virtualMethods[0]);
                 Check(override != nullptr, "accessor override found");
@@ -462,7 +478,7 @@ namespace {
             }
             Check(database->methodImpls[source].flags == sourceFlags, "override leaves source flags intact");
             fixture.methodImpls[source].flags |= 0x20;
-            Rejects([&] { ci::BuildTypeDatabase(fixture.header, specs); });
+            Rejects([&] { ci::BuildTDB(fixture.header, specs); });
         }
         std::cout << "PASS: SpecialName inheritance across two overrides, ordinary method flags, alias slots and final rejection\n";
     }
@@ -470,7 +486,7 @@ namespace {
     void TestOriginalAccessorSpecialName(const RE::TDB& header) {
         ci::MethodSpec method{.name = "get_IdleActionNo", .kind = ci::MethodKind::Override, .returnType = "ace.ACTION_ID"};
         std::vector<ci::CustomTypeConfig> specs{{.name = "Tests.EnemyExtendAccessor", .base = "app.cEnemyExtendBase", .methods = {method}, .abstract = true}};
-        auto database = ci::BuildTypeDatabase(header, specs);
+        auto database = ci::BuildTDB(header, specs);
         auto* type = database->FindType(specs[0].name);
         const auto* definition = database->GetMethodDef(&database->types[type->index], method.name);
         auto* override = definition ? database->FindMethod(uint32_t(definition - database->methods.data())) : nullptr;
@@ -513,7 +529,7 @@ namespace {
         ci::CustomTypeConfig base{.name = "Tests.ReferencePrefix", .fields = {{"Prefix", "System.Object"}}};
         ci::CustomTypeConfig derived{.name = "Tests.EmbeddedReferences", .base = base.name,
                             .fields = {{"Payload", "Tests.ReferencePayload"}, {"Tail", "System.Object"}}};
-        auto database = ci::BuildTypeDatabase(fixture.header, {base, derived});
+        auto database = ci::BuildTDB(fixture.header, {base, derived});
         const auto* type = QueryType(database, derived.name);
         const auto* field = database->GetFieldDef(type, "Payload");
         const auto* tail = database->GetFieldDef(type, "Tail");
@@ -563,8 +579,8 @@ namespace {
                          .binding = {.backend = ci::Backend::Cpp, .address = reinterpret_cast<void*>(value)}},
                         {.name = "Second", .returnType = "System.Int32",
                          .binding = {.backend = ci::Backend::Cpp, .address = reinterpret_cast<void*>(value)}}}};
-        auto first = ci::BuildTypeDatabase(fixture.header, {declaration});
-        auto second = ci::BuildTypeDatabase(fixture.header, {declaration});
+        auto first = ci::BuildTDB(fixture.header, {declaration});
+        auto second = ci::BuildTDB(fixture.header, {declaration});
         first->encodingBase = second->encodingBase = uintptr_t(GetModuleHandleW(nullptr));
         // Force both matching signatures through the generator, independent of native recipe availability.
         for (const auto& method : second->customMethods) {
@@ -580,7 +596,7 @@ namespace {
         Check(call(nullptr, nullptr) == 42, "destroying an unpublished database preserves another database's code");
 
         declaration.methods[1].binding.address = nullptr;
-        auto failed = ci::BuildTypeDatabase(fixture.header, {declaration});
+        auto failed = ci::BuildTDB(fixture.header, {declaration});
         failed->encodingBase = second->encodingBase;
         Rejects([&] { ci::CreateMethodTrampolines(*failed); });
         Check(!failed->methodTrampolines.empty() && failed->methodDeclarations.capacity() == 0,
@@ -609,7 +625,7 @@ namespace {
         ci::CustomTypeConfig base{.name = "Tests.VirtualBase", .methods = {method}};
         method.kind = ci::MethodKind::Override;
         ci::CustomTypeConfig child{.name = "Tests.VirtualChild", .base = base.name, .methods = {method}};
-        auto database = ci::BuildTypeDatabase(fixture.header, {base, child});
+        auto database = ci::BuildTDB(fixture.header, {base, child});
         auto* baseType = database->FindType(base.name);
         auto* childType = database->FindType(child.name);
         auto inherited = +[]() {};
@@ -653,36 +669,55 @@ namespace {
         auto native = +[]() { ++calls; };
         std::array<uint8_t, 32> originalBody{};
         std::memcpy(originalBody.data(), reinterpret_cast<void*>(native), originalBody.size());
-        // 安装后的 CALL 仍指向生产 bridge；测试 caller 保留到进程结束。
-        static BranchTrampoline page;
-        Check(page.Create(64), "test caller code allocation");
-        auto* caller = static_cast<uint8_t*>(page.Allocate(32));
-        std::array<uint8_t, 14> code{0x48, 0x83, 0xEC, 0x28, 0xE8, 0, 0, 0, 0,
-                                     0x48, 0x83, 0xC4, 0x28, 0xC3};
+        // 放在 EXE 的可执行节，覆盖生产安装函数的全映像扫描，而非传入已定位的 CALL。
+        // 两次原调用都执行 native；MOV 只将返回寄存器写入本测试的存储。
+        // 预留尾页，避免夹具所在节位于映像末尾时落入 ScanIDAPattern 的末页排除范围。
+        __declspec(allocate(".cihook")) static const std::array<uint8_t, 0x2000> callerStorage{};
+        static uintptr_t resultStorage;
+        auto* caller = const_cast<uint8_t*>(callerStorage.data());
+        std::array<uint8_t, 26> code{
+            0x48, 0x83, 0xEC, 0x28,
+            0x90, 0, 0, 0, 0,
+            0x90, 0, 0, 0, 0,
+            0x48, 0x89, 0x05, 0, 0, 0, 0,
+            0x48, 0x83, 0xC4, 0x28, 0xC3};
         auto call = uintptr_t(caller) + 4;
         auto delta = int64_t(uintptr_t(native)) - int64_t(call + 5);
         Check(delta >= INT32_MIN && delta <= INT32_MAX, "test native callee rel32 range");
         auto relative = int32_t(delta);
         std::memcpy(code.data() + 5, &relative, sizeof(relative));
+        auto secondCallDelta = int64_t(uintptr_t(native)) - int64_t(call + 10);
+        Check(secondCallDelta >= INT32_MIN && secondCallDelta <= INT32_MAX, "second test callee rel32 range");
+        auto secondCallRelative = int32_t(secondCallDelta);
+        std::memcpy(code.data() + 10, &secondCallRelative, sizeof(secondCallRelative));
+        auto resultDelta = int64_t(uintptr_t(&resultStorage)) - int64_t(uintptr_t(caller) + 21);
+        Check(resultDelta >= INT32_MIN && resultDelta <= INT32_MAX, "test result storage RIP-relative range");
+        auto resultRelative = int32_t(resultDelta);
+        std::memcpy(code.data() + 17, &resultRelative, sizeof(resultRelative));
         HookUtils::SafeWriteBuf(uintptr_t(caller), code.data(), code.size());
-        Check(!ci::InstallRuntimeInitializationCall(0, native) &&
-                  !ci::InstallRuntimeInitializationCall(call + 1, native) &&
-                  !ci::InstallRuntimeInitializationCall(call, nullptr), "invalid call-site hook gates");
-        Check(ci::InstallRuntimeInitializationCall(call, native) &&
+        // 写入后再补 CALL opcode，避免编译器的常量模板也被全映像扫描命中。
+        HookUtils::SafeWrite8(call, 0xE8);
+        HookUtils::SafeWrite8(call + 5, 0xE8);
+        // 夹具提供真实指令；定位和目标校验交给 HookInitializeManagedTypes。
+        Check(*reinterpret_cast<const uint8_t*>(call) == 0xE8 &&
+                  HookUtils::ReadOffsetData(call, 1, 5) == uintptr_t(native), "test caller targets native initialization");
+        ci::hooks::VM::RE_InitManagedTypes = native;
+        Check(ci::hooks::VM::HookInitializeManagedTypes() &&
                   HookUtils::ReadOffsetData(call, 1, 5) != uintptr_t(native), "real caller CALL bridge installed");
+        Check(ci::hooks::VM::RE_InitManagedTypes == native, "CALL installation preserves the resolved native entry");
         Check(g_branchTrampoline.Remain() == remainingBeforeCall - 14 && *originalCount == 123,
               "CALL bridge consumes shared pool without replacing or overwriting count storage");
         Check(std::memcmp(originalBody.data(), reinterpret_cast<void*>(native), originalBody.size()) == 0,
               "native initialization entry/body remain intact for RF invoke-table disassembly");
         reinterpret_cast<void (*)()>(caller)();
-        Check(calls == 1 && !ci::g_ready && *originalCount == 123 &&
+        Check(calls == 2 && !ci::TypeInjection::g_ready && *originalCount == 123 &&
                   std::memcmp(originalBody.data(), reinterpret_cast<void*>(native), originalBody.size()) == 0,
               "CALL bridge preserves native execution and fail-closed lifecycle without patching callee");
         std::cout << "PASS: shared count/CALL storage, actual native execution, intact callee entry/body for RF discovery\n";
     }
 
     void TestRuntimeReadyNotification() {
-        ci::g_ready = false;
+        ci::TypeInjection::g_ready = false;
         ci::g_database.reset();
         static int calls;
         static void* observedConstructor;
@@ -690,14 +725,15 @@ namespace {
         calls = 0;
         observedConstructor = nullptr;
         observedReady = false;
-        std::vector<ci::ClassProviderNotification> callbacks{{[](const ci::ProviderContext* context) noexcept {
+        auto& callbacks = ci::TypeInjection::g_providerCallbacks;
+        callbacks = {{[](const ci::ProviderContext* context) noexcept {
             ++calls;
-            observedReady = ci::g_ready.load();
+            observedReady = ci::TypeInjection::g_ready.load();
             observedConstructor = QueryMethod(context, QueryType(context, "System.Object"), ".ctor()");
         }}};
-        Check(!ci::FinalizeRuntimeTypes() && !ci::CompleteRuntimeInitialization(callbacks) &&
-                  callbacks.size() == 1 && !calls && !ci::g_ready,
-              "unpublished metadata cannot finalize or notify");
+        Check(!ci::TypeInjection::OnVmMethodsRegistered() &&
+                  callbacks.size() == 1 && !calls && !ci::TypeInjection::g_ready,
+              "unpublished metadata cannot notify providers");
         Fixture fixture;
         auto ctor = uint32_t(fixture.types[fixture.object].defaultCtorIndex);
         fixture.methodImpls[fixture.methods[ctor].impl].name = fixture.AddString(".ctor");
@@ -711,13 +747,13 @@ schema_version = 1
 name = "Tests.ReadyChild"
 base = "System.Object"
 )toml", "ready.toml");
-        ci::g_database = ci::BuildTypeDatabase(fixture.header, specs);
+        ci::g_database = ci::BuildTDB(fixture.header, specs);
         auto& database = *ci::g_database;
         database.encodingBase = 0x10000000;
         database.extensions.push_back({fixture.object, 0});
         database.methods[ctor].encodedOffset = 0;
-        Check(!ci::FinalizeRuntimeTypes() && !ci::CompleteRuntimeInitialization(callbacks) &&
-                  !database.runtimeTypesReady && !ci::g_ready && !calls && callbacks.size() == 1 && database.extensions.size() == 1,
+        Check(!ci::TypeInjection::OnVmTypeTablesBuilt() && !ci::TypeInjection::OnVmMethodsRegistered() &&
+                  !database.runtimeTypesReady && !ci::TypeInjection::g_ready && !calls && callbacks.size() == 1 && database.extensions.size() == 1,
               "failed runtime shape validation leaves notification pending");
 
         auto& parent = database.types[fixture.object];
@@ -730,7 +766,7 @@ base = "System.Object"
         child.typeInfo = &childInfo;
         parent.objectInfo = parentInfo.data() + 2;
         child.objectInfo = childInfo.data() + 2;
-        Check(ci::FinalizeRuntimeTypes() && database.runtimeTypesReady && !ci::g_ready && !calls &&
+        Check(ci::TypeInjection::OnVmTypeTablesBuilt() && database.runtimeTypesReady && !ci::TypeInjection::g_ready && !calls &&
                   callbacks.size() == 1 && database.extensions.capacity() == 0,
               "builder completion releases extension checks without publishing ready or notifying providers");
         auto& context = ci::GetContext();
@@ -742,14 +778,14 @@ base = "System.Object"
         database.methods[ctor].encodedOffset = 0x1234;
         auto expected = reinterpret_cast<void*>(database.encodingBase + 0x1234);
         parentSlots[0] = expected;
-        Check(!childSlots[0] && ci::CompleteRuntimeInitialization(callbacks),
+        Check(!childSlots[0] && ci::TypeInjection::OnVmMethodsRegistered(),
               "native registration completion resynchronizes inherited slots");
-        Check(ci::g_ready && observedReady && calls == 1 && observedConstructor == expected &&
+        Check(ci::TypeInjection::g_ready && observedReady && calls == 1 && observedConstructor == expected &&
                   childSlots[0] == expected && callbacks.empty(),
               "provider sees installed native ctor, inherited slot and public ready before RF SDK");
-        Check(ci::CompleteRuntimeInitialization(callbacks) && calls == 1,
+        Check(ci::TypeInjection::OnVmMethodsRegistered() && calls == 1,
               "completion and provider notification are one-shot");
-        ci::g_ready = false;
+        ci::TypeInjection::g_ready = false;
         ci::g_database.reset();
         std::cout << "PASS: actual Engine runtime phases, failed shape gate, pending native ctor, live cached entry, "
                      "inherited slot resync and one-shot ready notification before RF SDK\n";
@@ -800,7 +836,7 @@ return_type = "System.Int32"
 parameters = [{name = "value", type = "System.Int32"}]
 binding = {function = "QueryProbe", version = 1}
 )toml", "query.toml");
-        ci::g_database = ci::BuildTypeDatabase(fixture.header, specs);
+        ci::g_database = ci::BuildTDB(fixture.header, specs);
         auto& database = *ci::g_database;
         database.encodingBase = 0x10000000;
         for (auto& method : database.customMethods) {
@@ -894,7 +930,7 @@ binding = {function = "QueryProbe", version = 1}
         Fixture genericFixture;
         genericFixture.types[genericFixture.object].memberMethodIndex = 1;
         genericFixture.impls[genericFixture.object].numMemberMethods = 2;
-        auto genericRegistry = ci::BuildTypeDatabase(genericFixture.header, {});
+        auto genericRegistry = ci::BuildTDB(genericFixture.header, {});
         auto& impl = genericRegistry->typeImpls[genericRegistry->types[genericFixture.integer].implIndex];
         impl.nameOffset = int32_t(genericRegistry->strings.size());
         genericRegistry->strings.insert(genericRegistry->strings.end(), {'!', '0', '\0'});
@@ -932,7 +968,7 @@ fields = [
         Check(parsed.types[0].fields[0].serialize && !parsed.types[0].fields[1].serialize,
               "explicit RSZ declaration, runtime-only by default");
         Fixture fixture;
-        auto database = ci::BuildTypeDatabase(fixture.header, parsed.types);
+        auto database = ci::BuildTDB(fixture.header, parsed.types);
         auto first = uint32_t(database->types[database->customTypes[0].index].memberFieldIndex);
         Check(database->fieldImpls[database->fields[first].impl].flags == 0x4006 &&
                   database->fieldImpls[database->fields[first + 1].impl].flags == 6,
@@ -945,7 +981,7 @@ fields = [
                 type.parentTypeIndex = fixture.object;
             }
         }
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, parsed.types); });
+        Rejects([&] { ci::BuildTDB(fixture.header, parsed.types); });
         std::cout << "PASS: serialized field declaration/engine flag, runtime-only default, unchanged original RSZ schema\n";
     }
 
@@ -1045,7 +1081,7 @@ binding = { function = "OutNumberProbe", version = 1 }
                 }
             }
         }
-        auto database = ci::BuildTypeDatabase(fixture.header, specs);
+        auto database = ci::BuildTDB(fixture.header, specs);
         database->encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         ci::CreateMethodTrampolines(*database);
         ci::PrepareInvokeAdapters(*database);
@@ -1090,10 +1126,10 @@ binding = { function = "OutNumberProbe", version = 1 }
               "out interface signature and inherited override alias");
         auto broken = specs;
         broken[1].methods[1].parameters[0].modifier = ci::ParameterModifier::Value;
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, broken); });
+        Rejects([&] { ci::BuildTDB(fixture.header, broken); });
         broken = specs;
         broken[0].methods[1].parameters[1].type = "System.Void";
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, broken); });
+        Rejects([&] { ci::BuildTDB(fixture.header, broken); });
         for (auto modifier : {"in", "pointer", "invalid"}) {
             auto text = std::string(declaration);
             text.replace(text.find("modifier = \"out\""), 16, "modifier = \"" + std::string(modifier) + "\"");
@@ -1238,7 +1274,7 @@ binding = { function = "MutatePosition", version = 1 }
         aggregate.returnType = "Tests.Position";
         aggregate.binding.address = reinterpret_cast<void*>(&ReturnPosition);
         specs[0].methods.push_back(aggregate);
-        auto database = ci::BuildTypeDatabase(fixture.header, specs);
+        auto database = ci::BuildTDB(fixture.header, specs);
         database->encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         ci::CreateMethodTrampolines(*database);
         ci::PrepareInvokeAdapters(*database);
@@ -1308,13 +1344,13 @@ binding = { function = "MutatePosition", version = 1 }
         Rejects([&] { OrderDeclarationsForTest(overloads); });
         auto broken = specs;
         broken[1].methods[1].parameters[0].modifier = ci::ParameterModifier::Out;
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, broken); });
+        Rejects([&] { ci::BuildTDB(fixture.header, broken); });
         broken = specs;
         broken[0].methods[1].parameters[0].type = "System.Void";
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, broken); });
+        Rejects([&] { ci::BuildTDB(fixture.header, broken); });
         broken = specs;
         broken[0].methods[2].parameters.push_back("g");
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, broken); }); // 无七参数 recipe，不伪造 invokeId。
+        Rejects([&] { ci::BuildTDB(fixture.header, broken); }); // 无七参数 recipe，不伪造 invokeId。
         std::cout << "PASS: ref parsing, original flags, three/six arguments, virtual/interface override, value/reference "
                      "read-write, stack ABI, aggregate return and recipe rejection\n";
     }
@@ -1342,7 +1378,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         Check(module && !GetProcAddress(module, "UpdateTableInplProbe"), "ref implementation need not be exported");
         auto getCall = reinterpret_cast<FnGetNativeCallProbe>(GetProcAddress(module, "GetNativeCallProbe"));
         Check(getCall != nullptr, "ref provider call probe");
-        auto database = ci::BuildTypeDatabase(header, plugin.types);
+        auto database = ci::BuildTDB(header, plugin.types);
         database->encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         ci::CreateMethodTrampolines(*database);
         ci::PrepareInvokeAdapters(*database);
@@ -1389,7 +1425,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
     void TestReferenceArrays(const RE::TDB& header) {
         ci::CustomTypeConfig node{.name = "Tests.ArrayNode", .fields = {{"Value", "System.Int32", true}, {"Children", "Tests.ArrayNode[]", true}}};
         ci::CustomTypeConfig holder{.name = "Tests.ArrayHolder", .fields = {{"Nodes", "Tests.ArrayNode[]", true}, {"Numbers", "System.Int32[]", true}}};
-        auto metadata = ci::BuildTypeDatabase(header, {holder, node});
+        auto metadata = ci::BuildTDB(header, {holder, node});
         auto* array = metadata->FindType("Tests.ArrayNode[]");
         Check(array && metadata->customTypes.size() == 3, "deduplicated implicit reference array identity");
         const auto& definition = metadata->types[array->index];
@@ -1441,7 +1477,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
                   {.name = "GetItems", .kind = ci::MethodKind::Abstract, .returnType = "Tests.ArrayPayload[]"},
                   {.name = "SetItems", .kind = ci::MethodKind::Abstract,
                    .parameters = {{"items", "Tests.ArrayPayload[]"}}}}, .abstract = true};
-          auto signatureMetadata = ci::BuildTypeDatabase(header, {methodsOnly, payload});
+          auto signatureMetadata = ci::BuildTDB(header, {methodsOnly, payload});
           auto signatureArray = signatureMetadata->ResolveType("Tests.ArrayPayload[]");
           Check(signatureMetadata->customTypes.size() == 3 && signatureMetadata->types[signatureArray].objectType == 2,
                 "method-only return/parameter references synthesize one array identity");
@@ -1449,7 +1485,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
           ci::CustomTypeConfig generic{.name = "Tests.ArrayGeneric`1<Tests.ArrayArgument[]>",
                                .genericArguments = {"Tests.ArrayArgument[]"},
                                .genericDefinition = "Tests.ArrayGeneric`1"};
-          auto genericMetadata = ci::BuildTypeDatabase(header, {generic, argument});
+          auto genericMetadata = ci::BuildTDB(header, {generic, argument});
           auto genericArray = genericMetadata->ResolveType("Tests.ArrayArgument[]");
           auto* closed = genericMetadata->FindType(generic.name);
           const auto* descriptor = reinterpret_cast<const uint32_t*>(genericMetadata->bytes.data() +
@@ -1458,14 +1494,14 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
                     genericMetadata->types[genericArray].elementTypeIndex == genericMetadata->ResolveType(argument.name),
                 "array used only as a generic argument is synthesized before the closure");
           ci::CustomTypeConfig fakeArray{.name = "Tests.ArrayNode[]"};
-          Rejects([&] { ci::BuildTypeDatabase(header, {holder, node, fakeArray}); });
+          Rejects([&] { ci::BuildTDB(header, {holder, node, fakeArray}); });
         auto invalid = holder;
         invalid.fields[0].type = "Tests.Missing[]";
-        Rejects([&] { ci::BuildTypeDatabase(header, {invalid}); });
+        Rejects([&] { ci::BuildTDB(header, {invalid}); });
         invalid.fields[0].type = "Tests.ArrayNode[][]";
-        Rejects([&] { ci::BuildTypeDatabase(header, {node, invalid}); });
+        Rejects([&] { ci::BuildTDB(header, {node, invalid}); });
         invalid.fields[0].type = "Tests.ArrayNode[,]";
-        Rejects([&] { ci::BuildTypeDatabase(header, {node, invalid}); });
+        Rejects([&] { ci::BuildTDB(header, {node, invalid}); });
           std::cout << "PASS: implicit reference arrays, recursive fields, rank identity, reverse lookup, native storage, shared-TypeInfo finalization and class-unique TypeInfo regression\n";
     }
 
@@ -1493,8 +1529,8 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
             if (type.name == play) type.fields[1].type = selection;
         }
         const auto oldImpls = std::vector<RE::RETypeImpl>(header.typeImpls, header.typeImpls + header.numTypeImpl);
-        auto before = ci::BuildTypeDatabase(header, oldTypes);
-        auto after = ci::BuildTypeDatabase(header, newTypes);
+        auto before = ci::BuildTDB(header, oldTypes);
+        auto after = ci::BuildTDB(header, newTypes);
         auto Bitmap = [](const RE::RETypeImpl& impl, size_t offset) {
             uint64_t value{};
             Check(impl.fieldSize <= 0x200, "motion selection uses inline reference maps");
@@ -1557,7 +1593,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         const std::string text{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
         auto plugin = ci::ParseProviderConfig(text, CI_TEST_FLOAT_MANIFEST);
         Check(ci::LoadClassProviderBindings(plugin), "floating return provider bindings");
-        auto database = ci::BuildTypeDatabase(header, plugin.types);
+        auto database = ci::BuildTDB(header, plugin.types);
         database->encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         const auto expectedMethods = database->methodDeclarations;
         ci::CreateMethodTrampolines(*database);
@@ -1584,7 +1620,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         for (auto& parameter : parameters) if (parameter.type == real) parameter.type = integer;
         auto missing = header;
         missing.params = parameters.data();
-        auto generated = ci::BuildTypeDatabase(missing, plugin.types);
+        auto generated = ci::BuildTDB(missing, plugin.types);
         size_t doubleAdapters{};
         for (const auto& method : generated->customMethods) {
             if (generated->methodDeclarations[method.index - generated->originalMethodCount].returnType == "System.Double") {
@@ -1603,7 +1639,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         std::string text{std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>()};
         auto plugin = ci::ParseProviderConfig(text, std::filesystem::absolute(manifest));
         Check(ci::LoadClassProviderBindings(plugin), "additional provider bindings");
-        auto metadata = ci::BuildTypeDatabase(header, plugin.types);
+        auto metadata = ci::BuildTDB(header, plugin.types);
         auto registered = plugin.types.size();
         Check(registered != 0 && metadata->customTypes.size() >= registered, "all resource declarations and host types registered");
         // Provider manifests evolve independently of this fixture. Verify every
@@ -1651,7 +1687,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         auto plugin = ReadFixture("closed", "ClassInjectorClosedTypes_ci.toml");
         Check(ci::LoadClassProviderBindings(plugin), "closed provider registration");
         auto specs = plugin.types;
-        ci::g_database = ci::BuildTypeDatabase(header, specs);
+        ci::g_database = ci::BuildTDB(header, specs);
         auto& database = *ci::g_database;
         auto definition = database.ResolveType("ClassInjector.Tests.ThinkTimerReset`1");
         auto enumeration = database.ResolveType("System.DayOfWeek");
@@ -1721,22 +1757,22 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
         Check(*reinterpret_cast<int32_t*>(self.fields.data() + 4) == -100, "derived start binding");
         auto invalid = specs;
         invalid[0].name = "ClassInjector.Tests.BadName";
-        Rejects([&] { ci::BuildTypeDatabase(header, invalid); });
+        Rejects([&] { ci::BuildTDB(header, invalid); });
         invalid = specs;
         invalid[2].base = "System.Diagnostics.Stopwatch";
-        Rejects([&] { ci::BuildTypeDatabase(header, invalid); });
+        Rejects([&] { ci::BuildTDB(header, invalid); });
         invalid = specs;
         invalid[0].genericArguments = {"System.Object", "System.Object"};
-        Rejects([&] { ci::BuildTypeDatabase(header, invalid); });
+        Rejects([&] { ci::BuildTDB(header, invalid); });
         invalid = specs;
         invalid[0].genericArguments = {"ClassInjector.Tests.ThinkTimerReset`1"};
         invalid[0].name = "ClassInjector.Tests.ThinkTimerReset`1<ClassInjector.Tests.ThinkTimerReset`1>";
-        Rejects([&] { ci::BuildTypeDatabase(header, invalid); });
+        Rejects([&] { ci::BuildTDB(header, invalid); });
         if (database.typeNames.contains("System.Guid")) {
             invalid = specs;
             invalid[0].genericArguments = {"System.Guid"};
             invalid[0].name = "ClassInjector.Tests.ThinkTimerReset`1<System.Guid>";
-            Rejects([&] { ci::BuildTypeDatabase(header, invalid); });
+            Rejects([&] { ci::BuildTDB(header, invalid); });
         }
         for (auto declaration : {
                  "generic_definition='Tests.Generic`1'",
@@ -1754,7 +1790,7 @@ binding = { function = "UpdateTableInplProbe", version = 1 }
             multiple[i].name = multiple[i].genericDefinition + '<' + multiple[i].genericArguments[0] + ",System.Int32>";
             multiple[i + 1].base = multiple[i].name;
         }
-        auto two = ci::BuildTypeDatabase(header, multiple);
+        auto two = ci::BuildTDB(header, multiple);
         auto& twoDefinition = two->types[two->ResolveType("ClassInjector.Tests.ThinkTimerReset`2")];
         auto* twoDescriptor = reinterpret_cast<const uint32_t*>(two->bytes.data() + twoDefinition.genericsOffset);
         Check(((twoDescriptor[0] >> 19) & 127) == 2 && twoDescriptor[2] == 0 && twoDescriptor[4] == 0 &&
@@ -1985,7 +2021,7 @@ renames=[{fromName='Second',to='Third'}]
                                                                      : type.methods.back().parameters[0].name;
             Check(name.contains('\0'), "TOML preserves the NUL that the native name pool cannot represent");
             bool rejected = false;
-            try { ci::BuildTypeDatabase(fixture.header, std::move(declarations)); }
+            try { ci::BuildTDB(fixture.header, std::move(declarations)); }
             catch (const std::runtime_error& error) {
                 Check(std::string_view(error.what()).contains(std::string(member) + " name contains NUL"),
                       "NUL name rejection identifies the author member kind");
@@ -1996,12 +2032,12 @@ renames=[{fromName='Second',to='Third'}]
         for (const auto* name : {".Example", "Tests.", "."}) {
             auto declarations = ci::ParseCustomTypeConfig(
                 std::string("schema_version=1\n[[types]]\nname='") + name + "'", "author-names.toml");
-            Rejects([&] { ci::BuildTypeDatabase(fixture.header, declarations); });
+            Rejects([&] { ci::BuildTDB(fixture.header, declarations); });
         }
         auto declarations = ci::ParseCustomTypeConfig(
             "schema_version=1\n[[types]]\nname='Tests.Names.Accepted'\n"
             "fields=[{name='<Count>k__BackingField',type='System.Int32'}]", "author-names.toml");
-        auto database = ci::BuildTypeDatabase(fixture.header, std::move(declarations));
+        auto database = ci::BuildTDB(fixture.header, std::move(declarations));
         const auto* type = QueryType(database, "Tests.Names.Accepted");
         Check(type && database->GetFullName(uint32_t(type->index)) == "Tests.Names.Accepted" &&
                   database->GetFieldDef(type, "<Count>k__BackingField") && database->GetMethodDef(type, ".ctor()"),
@@ -2032,7 +2068,7 @@ renames=[{fromName='Second',to='Third'}]
         };
         auto Invalid = [&](const char* file, const char* body) {
             auto declarations = ci::ParseCustomTypeConfig(std::string("schema_version=1\n") + body, file);
-            ci::BuildTypeDatabase(fixture.header, std::move(declarations));
+            ci::BuildTDB(fixture.header, std::move(declarations));
         };
         ExpectError([&] { Invalid("field-origin.toml", "[[types]]\nname='Tests.BadField'\nfields=[{name='Broken',type='Tests.Absent'}]"); },
                     {"field-origin.toml", "field-origin.dll", "Tests.BadField", "field Broken", "Tests.Absent"});
@@ -2047,11 +2083,11 @@ renames=[{fromName='Second',to='Third'}]
         auto first = ci::ParseCustomTypeConfig("schema_version=1\n[[types]]\nname='Tests.Duplicate'", "first-provider.toml");
         auto second = ci::ParseCustomTypeConfig("schema_version=1\n[[types]]\nname='Tests.Duplicate'", "second-provider.toml");
         first.push_back(std::move(second[0]));
-        ExpectError([&] { ci::BuildTypeDatabase(fixture.header, first); }, {"first-provider.toml", "second-provider.toml", "Tests.Duplicate"});
+        ExpectError([&] { ci::BuildTDB(fixture.header, first); }, {"first-provider.toml", "second-provider.toml", "Tests.Duplicate"});
 
         auto declarations = ci::ParseCustomTypeConfig("schema_version=1\n[[types]]\nname='Tests.BindingOwner'\nmethods=[{name='Fetch',binding={function='Unresolved',version=1}}]", "entry-origin.toml");
         std::weak_ptr<const ci::ProviderSource> providerSource = declarations[0].providerSource;
-        auto database = ci::BuildTypeDatabase(fixture.header, std::move(declarations));
+        auto database = ci::BuildTDB(fixture.header, std::move(declarations));
         Check(!providerSource.expired() && database->methodDeclarations.back().providerSource, "method declarations retain source until entry generation");
         database->encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         ExpectError([&] { ci::CreateMethodTrampolines(*database); }, {"entry-origin.toml", "Tests.BindingOwner.Fetch", "Unresolved"});
@@ -2076,14 +2112,14 @@ renames=[{fromName='Second',to='Third'}]
                        {"Nested", box.name}, {"Unchanged", similarName.name}},
             .genericArguments = {"System.Diagnostics.Stopwatch", "System.Int32"},
             .genericDefinition = "Tests.Pair`2"};
-        auto source = ci::BuildTypeDatabase(fixture.header, {pair, box, integerBox, similarName});
+        auto source = ci::BuildTDB(fixture.header, {pair, box, integerBox, similarName});
         auto header = fixture.header;
         source->Publish(header);
         ci::CustomTypeConfig swapped{
             .name = "Tests.Pair`2<System.Int32,System.Diagnostics.Stopwatch>",
             .genericTemplate = pair.name,
             .genericArguments = {"System.Int32", "System.Diagnostics.Stopwatch"}};
-        auto result = ci::BuildTypeDatabase(header, {swapped});
+        auto result = ci::BuildTDB(header, {swapped});
         auto* type = result->FindType(swapped.name);
         auto swappedFields = ReadInstanceFields(*result, type->index);
         Check(type && result->GetFullName(swappedFields[0].type) == "System.Int32" &&
@@ -2096,19 +2132,19 @@ renames=[{fromName='Second',to='Third'}]
         pair.name = "Tests.Pair`2<System.Diagnostics.Stopwatch,System.Diagnostics.Stopwatch>";
         pair.genericArguments[1] = "System.Diagnostics.Stopwatch";
         pair.fields[1].type = "System.Diagnostics.Stopwatch";
-        auto repeated = ci::BuildTypeDatabase(fixture.header, {pair, box, integerBox, similarName});
+        auto repeated = ci::BuildTDB(fixture.header, {pair, box, integerBox, similarName});
         header = fixture.header;
         repeated->Publish(header);
         swapped.genericTemplate = pair.name;
         bool ambiguous = false;
-        try { ci::BuildTypeDatabase(header, {swapped}); }
+        try { ci::BuildTDB(header, {swapped}); }
         catch (const std::exception& error) {
             ambiguous = std::string_view(error.what()).contains("ambiguous generic template argument");
         }
         Check(ambiguous, "repeated source argument with different replacements is ambiguous");
         swapped.name = "Tests.Pair`2<System.Int32,System.Int32>";
         swapped.genericArguments[1] = "System.Int32";
-        result = ci::BuildTypeDatabase(header, {swapped});
+        result = ci::BuildTDB(header, {swapped});
         type = result->FindType(swapped.name);
         swappedFields = ReadInstanceFields(*result, type->index);
         Check(type && swappedFields[0].type == fixture.integer && swappedFields[1].type == fixture.integer,
@@ -2157,7 +2193,7 @@ renames=[{fromName='Second',to='Third'}]
         fixture.header.typeImpls = fixture.impls.data();
         fixture.header.numStringPool = uint32_t(fixture.strings.size());
         fixture.header.stringPool = fixture.strings.data();
-        auto baseline = ci::BuildTypeDatabase(fixture.header, {});
+        auto baseline = ci::BuildTDB(fixture.header, {});
         auto index = baseline->ResolveType("System.Diagnostics.Stopwatch");
         auto& original = fixture.types[index];
         auto& originalImpl = fixture.impls[original.implIndex];
@@ -2194,7 +2230,7 @@ fields = [{ name = "Counter", type = "System.Int32" }, { name = "Peer", type = "
 )toml",
                                            "final_fields.toml");
         Check(specs.size() == 1 && specs[0].extend && specs[0].methods.empty(), "extension has no generated ctor");
-        auto database = ci::BuildTypeDatabase(fixture.header, specs);
+        auto database = ci::BuildTDB(fixture.header, specs);
         auto& definition = database->types[index];
         auto& impl = database->typeImpls[definition.implIndex];
         Check(database->types.size() == fixture.types.size() && database->customTypes.empty() &&
@@ -2238,13 +2274,13 @@ fields = [{ name = "Counter", type = "System.Int32" }, { name = "Peer", type = "
         auto mixed = specs;
         mixed[0].fields[1].type = "Tests.ExtensionReference";
         mixed.push_back({.name = "Tests.ExtensionReference"});
-        auto combined = ci::BuildTypeDatabase(fixture.header, mixed);
+        auto combined = ci::BuildTDB(fixture.header, mixed);
         Check(combined->FindType("Tests.ExtensionReference")->index == fixture.header.numTypes &&
                   combined->ResolveType(specs[0].name) == index,
               "extension references a new class without shifting custom type IDs");
         auto repeated = specs;
         repeated.push_back({.name = specs[0].name, .fields = {{"Another", "System.Object"}}, .extend = true});
-        auto merged = ci::BuildTypeDatabase(fixture.header, repeated);
+        auto merged = ci::BuildTDB(fixture.header, repeated);
         auto& mergedImpl = merged->typeImpls[merged->types[index].implIndex];
         Check(mergedImpl.fieldSize == 40 && mergedImpl.numMemberFields == 6 && merged->extensions.size() == 1 &&
                   merged->extensions[0].originalFieldSize == 16,
@@ -2253,7 +2289,7 @@ fields = [{ name = "Counter", type = "System.Int32" }, { name = "Peer", type = "
         // 两种非 sealed flags 都应通过；仍只清 compact arena 位，不伪造 sealed。
         for (auto flags : {0x41100001u, 0x100001u}) {
             original.typeFlags = flags;
-            auto leaf = ci::BuildTypeDatabase(fixture.header, specs);
+            auto leaf = ci::BuildTDB(fixture.header, specs);
             auto& leafDefinition = leaf->types[index];
             auto& leafImpl = leaf->typeImpls[leafDefinition.implIndex];
             Check(leafDefinition.typeFlags == (flags & ~0x01000000u) && leafDefinition.parentTypeIndex == original.parentTypeIndex && leafDefinition.defaultCtorIndex == original.defaultCtorIndex,
@@ -2286,7 +2322,7 @@ base = "System.Diagnostics.Stopwatch"
 fields = [{ name = "OwnPeer", type = "System.Object" }]
 )toml", "leaf_derived.toml");
         descendants.insert(descendants.end(), specs.begin(), specs.end());
-        auto derivedRegistry = ci::BuildTypeDatabase(fixture.header, descendants);
+        auto derivedRegistry = ci::BuildTDB(fixture.header, descendants);
         auto* derived = derivedRegistry->FindType("Tests.LeafDerived");
         auto* grandchild = derivedRegistry->FindType("Tests.LeafGrandchild");
         Check(derived && grandchild && derived->parent == index && grandchild->parent == derived->index,
@@ -2310,7 +2346,7 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         fixture.types[originalChild].parentTypeIndex = index;
         std::string rejection;
         try {
-            ci::BuildTypeDatabase(fixture.header, specs);
+            ci::BuildTDB(fixture.header, specs);
         } catch (const std::exception& error) {
             rejection = error.what();
         }
@@ -2322,16 +2358,16 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
 
         for (auto badFlags : {0x51100101u, 0x49100101u, 0x41100181u, 0x41100021u, 0x411000A1u, 0x49100001u, 0x51100001u}) {
             original.typeFlags = badFlags;
-            Rejects([&] { ci::BuildTypeDatabase(fixture.header, specs); });
+            Rejects([&] { ci::BuildTDB(fixture.header, specs); });
         }
         original.typeFlags = 0x41100101;
         original.objectType = 5;
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, specs); });
+        Rejects([&] { ci::BuildTDB(fixture.header, specs); });
         original.objectType = 1;
         for (auto name : {"OriginalPeer", "OriginalNumber", "OriginalStatic"}) {
             auto duplicate = specs;
             duplicate[0].fields[0].name = name;
-            Rejects([&] { ci::BuildTypeDatabase(fixture.header, duplicate); });
+            Rejects([&] { ci::BuildTDB(fixture.header, duplicate); });
         }
         originalImpl.fieldSize = 512;
         originalBits = uint64_t(1) << 63;
@@ -2339,7 +2375,7 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         for (size_t offset : {0x20, 0x28}) {
             std::memcpy(reinterpret_cast<uint8_t*>(&originalImpl) + offset, &originalBits, 8);
         }
-        auto large = ci::BuildTypeDatabase(fixture.header, specs);
+        auto large = ci::BuildTDB(fixture.header, specs);
         auto& largeImpl = large->typeImpls[large->types[index].implIndex];
         for (size_t offset : {0x20, 0x28}) {
             const uint64_t* bits;
@@ -2353,7 +2389,7 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         for (size_t offset : {0x20, 0x28}) {
             std::memcpy(reinterpret_cast<uint8_t*>(&originalImpl) + offset, &address, 8);
         }
-        auto external = ci::BuildTypeDatabase(fixture.header, specs);
+        auto external = ci::BuildTDB(fixture.header, specs);
         auto& externalImpl = external->typeImpls[external->types[index].implIndex];
         const uint64_t* newMap;
         std::memcpy(&newMap, reinterpret_cast<uint8_t*>(&externalImpl) + 0x20, 8);
@@ -2403,7 +2439,7 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
             {.name = "Tests.Parameterized", .base = "Tests.ParameterizedBase", .fields = {{"Sentinel"}}, .methods = {noArgs, sixArgs}},
             {.name = "Tests.ParameterizedOnly", .base = "Tests.ParameterizedBase", .methods = {sixArgs}}};
         auto previous = std::move(ci::g_database);
-        ci::g_database = ci::BuildTypeDatabase(fixture.header, specs);
+        ci::g_database = ci::BuildTDB(fixture.header, specs);
         auto& database = *ci::g_database;
         database.encodingBase = uintptr_t(parentCtor) - 0x1000;
         ci::CreateMethodTrampolines(database);
@@ -2430,20 +2466,20 @@ fields = [{ name = "OwnPeer", type = "System.Object" }]
         Check(values == std::array<int32_t, 8>{7, -11, 13, -17, 19, -23, int32_t(0xCCCCCCCC), int32_t(0xCCCCCCCC)}, "all register/stack parameters preserved without host clearing");
         auto reversed = specs;
         std::ranges::reverse(reversed[1].methods);
-        auto reordered = ci::BuildTypeDatabase(fixture.header, reversed);
+        auto reordered = ci::BuildTDB(fixture.header, reversed);
         const auto* reorderedType = QueryType(reordered, "Tests.Parameterized");
         Check(reorderedType->defaultCtorIndex == reordered->GetMethodDef(reorderedType, ".ctor()") - reordered->methods.data(), "default constructor index is independent of overload order");
         auto invalid = specs;
         invalid[1].methods[1].binding = {};
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, invalid); });
+        Rejects([&] { ci::BuildTDB(fixture.header, invalid); });
         invalid = specs;
         auto refOnly = sixArgs;
         refOnly.parameters[0].modifier = ci::ParameterModifier::Ref;
         invalid[1].methods.push_back(refOnly);
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, invalid); });
+        Rejects([&] { ci::BuildTDB(fixture.header, invalid); });
         invalid = specs;
         invalid.push_back({.name = "Tests.InvalidDefault", .base = "Tests.ParameterizedOnly", .methods = {{.name = ".ctor", .kind = ci::MethodKind::Constructor}}});
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, invalid); });
+        Rejects([&] { ci::BuildTDB(fixture.header, invalid); });
         ci::g_database = std::move(previous);
         std::cout << "PASS: explicit constructors, six parameters, provider-owned parent call, no host memset, exact invoke recipe, overload order, no inherited constructors and negative declarations\n";
     }
@@ -2499,7 +2535,9 @@ int main(int argc, char** argv) {
         TestFinalFields();
         TestParameterizedConstructors();
         Check(ci::NameHash("System.Object") == 3218255520u, "engine hash mismatch");
-        auto declarations = ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "basic"});
+        std::vector<ci::CustomTypeConfig> declarations;
+        std::vector<ci::ClassProviderNotification> loadedProviderCallbacks;
+        ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "basic"}, declarations, loadedProviderCallbacks);
         Check(declarations.size() == 2, "TOML class count");
         Check(declarations[0].methods[0].binding.backend == ci::Backend::Cpp, "cpp binding");
         Check(declarations[1].methods[1].binding.backend == ci::Backend::Cpp, "cpp override binding");
@@ -2507,16 +2545,17 @@ int main(int argc, char** argv) {
         Check(provider != nullptr, "type plugin load");
         Check(GetProcAddress(provider, "ci_register_provider") != nullptr, "registration bridge export");
         Check(GetProcAddress(provider, "Add") == nullptr, "business functions must not be exported");
-        auto pluginDeclarations = ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "types"});
+        std::vector<ci::CustomTypeConfig> pluginDeclarations;
+        ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "types"}, pluginDeclarations, loadedProviderCallbacks);
         const auto orderedPluginDeclarations = OrderDeclarationsForTest(pluginDeclarations);
         Check(orderedPluginDeclarations.size() == 2 && orderedPluginDeclarations[1].base == orderedPluginDeclarations[0].name,
               "type plugin inheritance");
         Check(pluginDeclarations[0].methods[0].binding.address != nullptr, "registered binding address");
         Fixture pluginFixture;
-        auto pluginRegistry = ci::BuildTypeDatabase(pluginFixture.header, pluginDeclarations);
+        auto pluginRegistry = ci::BuildTDB(pluginFixture.header, pluginDeclarations);
         Check(pluginRegistry->customTypes.size() == 2, "type plugin metadata expansion");
         Fixture fixture;
-        auto database = ci::BuildTypeDatabase(fixture.header, declarations);
+        auto database = ci::BuildTDB(fixture.header, declarations);
         Check(database->types.size() == 7, "type expansion");
         Check(std::memcmp(database->types.data(), fixture.types.data(),
                           fixture.types.size() * sizeof(RE::RETypeDefinition)) == 0,
@@ -2571,7 +2610,7 @@ int main(int argc, char** argv) {
         bitmapFixture.typeImpls[1].fieldSize = 0x208;
         auto bitmap = uintptr_t(bitmapFixture.bytePool) + 4;
         std::memcpy(reinterpret_cast<uint8_t*>(&bitmapFixture.typeImpls[1]) + 0x20, &bitmap, 8);
-        auto bitmapCopy = ci::BuildTypeDatabase(bitmapFixture, declarations);
+        auto bitmapCopy = ci::BuildTDB(bitmapFixture, declarations);
         uintptr_t rebased;
         std::memcpy(&rebased, reinterpret_cast<uint8_t*>(&bitmapCopy->typeImpls[1]) + 0x20, 8);
         Check(rebased == uintptr_t(bitmapCopy->bytes.data()) + 4, "external bitmap rebasing");
@@ -2585,17 +2624,17 @@ int main(int argc, char** argv) {
         Rejects([&] { OrderDeclarationsForTest(reversed); });
         auto badSignature = declarations;
         badSignature[1].methods[1].parameters.push_back("bad");
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, badSignature); });
+        Rejects([&] { ci::BuildTDB(fixture.header, badSignature); });
         auto duplicateField = declarations;
         duplicateField[1].fields.push_back({.name = "Counter"});
-        Rejects([&] { ci::BuildTypeDatabase(fixture.header, duplicateField); });
+        Rejects([&] { ci::BuildTDB(fixture.header, duplicateField); });
 
         ci::CustomTypeConfig references{
             .name = "Tests.References",
             .fields = {{"Number", "System.Int32"}, {"Object", "System.Object"}, {"Peer", "Tests.References"}}};
         ci::CustomTypeConfig childReferences{
             .name = "Tests.ChildReferences", .base = references.name, .fields = {{"Another", "System.Object"}}};
-        auto referenceMetadata = ci::BuildTypeDatabase(fixture.header, {references, childReferences});
+        auto referenceMetadata = ci::BuildTDB(fixture.header, {references, childReferences});
         auto& referenceBase = referenceMetadata->customTypes[0];
         auto& referenceChild = referenceMetadata->customTypes[1];
         auto& referenceImpl = referenceMetadata->typeImpls[referenceMetadata->types[referenceBase.index].implIndex];
@@ -2613,7 +2652,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 65; ++i) {
             large.fields.push_back({"Reference" + std::to_string(i), "System.Object"});
         }
-        auto largeMetadata = ci::BuildTypeDatabase(fixture.header, {large});
+        auto largeMetadata = ci::BuildTDB(fixture.header, {large});
         auto& largeImpl = largeMetadata->typeImpls[largeMetadata->types[largeMetadata->customTypes[0].index].implIndex];
         uint64_t* largeMap;
         std::memcpy(&largeMap, reinterpret_cast<uint8_t*>(&largeImpl) + 0x20, 8);
@@ -2640,7 +2679,7 @@ int main(int argc, char** argv) {
             std::string extensionText{std::istreambuf_iterator<char>(extensionFile), std::istreambuf_iterator<char>()};
             auto extensions = ci::ParseCustomTypeConfig(extensionText, "final_fields.toml");
             extensions.push_back({.name = "app.cHunterWp03Handling", .fields = {{"CILeafCounter", "System.Int32"}, {"CILeafPeer", "System.Object"}}, .extend = true});
-            auto extended = ci::BuildTypeDatabase(header, extensions);
+            auto extended = ci::BuildTDB(header, extensions);
             Check(extended->types.size() == header.numTypes && extended->extensions.size() == 3,
                   "real TDB extension-only type identity");
             for (auto& entry : extended->extensions) {
@@ -2669,8 +2708,9 @@ int main(int argc, char** argv) {
             auto classProvider = LoadLibraryW(RE::widen(CI_TEST_CLASS_PLUGIN).c_str());
             Check(classProvider != nullptr, "class test provider load");
             std::vector<ci::ClassProviderNotification> callbacks;
-            auto classDeclarations = ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "class"}, &callbacks);
-            auto classMetadata = ci::BuildTypeDatabase(header, classDeclarations);
+            std::vector<ci::CustomTypeConfig> classDeclarations;
+            ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "class"}, classDeclarations, callbacks);
+            auto classMetadata = ci::BuildTDB(header, classDeclarations);
             const auto expectedClassMethods = classMetadata->methodDeclarations;
             auto* arg = classMetadata->FindType("ClassInjector.Tests.Arg");
             auto* cmd = classMetadata->FindType("ClassInjector.Tests.Cmd");
@@ -2707,7 +2747,7 @@ int main(int argc, char** argv) {
             auto invalidBehavior = classDeclarations;
             auto& invalidType = *std::ranges::find(invalidBehavior, behavior->name, &ci::CustomTypeConfig::name);
             std::ranges::find(invalidType.methods, "doAwake", &ci::MethodSpec::name)->name = "awake";
-            Rejects([&] { ci::BuildTypeDatabase(header, invalidBehavior); });
+            Rejects([&] { ci::BuildTDB(header, invalidBehavior); });
             Check(arg && cmd && generic && generic->genericDefinition && cmd->parent == generic->index,
                   "real generic hierarchy");
             Check(classMetadata->GetFullName(generic->index) == generic->name, "real generic type identity");
@@ -2874,8 +2914,9 @@ int main(int argc, char** argv) {
             }
             auto interfaceProvider = LoadLibraryW(RE::widen(CI_TEST_INTERFACE_PLUGIN).c_str());
             Check(interfaceProvider != nullptr, "interface test provider load");
-            auto interfaceDeclarations = ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "interface"});
-            auto interfaceMetadata = ci::BuildTypeDatabase(header, interfaceDeclarations);
+            std::vector<ci::CustomTypeConfig> interfaceDeclarations;
+            ci::LoadClassProviders({std::filesystem::path(CI_TEST_MANIFESTS) / "interface"}, interfaceDeclarations, loadedProviderCallbacks);
+            auto interfaceMetadata = ci::BuildTDB(header, interfaceDeclarations);
             auto& injected = *interfaceMetadata;
             auto InterfaceMethod = [&](std::string_view owner, std::string_view interfaceName, size_t slot) {
                 auto* type = injected.FindType(owner);
@@ -2916,20 +2957,20 @@ int main(int argc, char** argv) {
                   "explicit interface mapping");
             auto broken = interfaceDeclarations;
             std::erase_if(broken[0].methods, [](auto& method) { return method.name == "MoveNext"; });
-            Rejects([&] { ci::BuildTypeDatabase(header, broken); });
+            Rejects([&] { ci::BuildTDB(header, broken); });
             broken = interfaceDeclarations;
             broken[0].interfaces.push_back("System.Object");
-            Rejects([&] { ci::BuildTypeDatabase(header, broken); });
+            Rejects([&] { ci::BuildTDB(header, broken); });
             broken = interfaceDeclarations;
             broken[4].abstract = false;
-            Rejects([&] { ci::BuildTypeDatabase(header, broken); });
+            Rejects([&] { ci::BuildTDB(header, broken); });
             broken = interfaceDeclarations;
             broken.back().interfaces.push_back("System.IDisposable"); // Same dispatch index as ICollection<T>.
             broken.back().fields.push_back({"Counter", "System.Int32"});
             broken.back().methods.push_back(*std::ranges::find(broken[0].methods, "Dispose", &ci::MethodSpec::name));
             std::string conflict;
             try {
-                ci::BuildTypeDatabase(header, broken);
+                ci::BuildTDB(header, broken);
             } catch (const std::exception& error) {
                 conflict = error.what();
             }
@@ -3001,7 +3042,7 @@ int main(int argc, char** argv) {
         ci::ProviderConfig nativePlugin{.configPath = "native.toml", .dllPath = CI_TEST_PROVIDER, .types = declarations};
         Check(ci::LoadClassProviderBindings(nativePlugin), "native test function registration");
         declarations = std::move(nativePlugin.types);
-        ci::g_database = ci::BuildTypeDatabase(fixture.header, declarations);
+        ci::g_database = ci::BuildTDB(fixture.header, declarations);
         auto& native = *ci::g_database;
         native.encodingBase = uintptr_t(&ObjectCtor) - 0x1000;
         native.methods[native.types[fixture.object].defaultCtorIndex].encodedOffset = 0x1000;

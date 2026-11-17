@@ -13,6 +13,9 @@
 #include <limits>
 #include <utility>
 
+// 与主测试相同，直接编译接入实现以设置文件内 Provider 通知队列，不增加生产测试接口。
+#include "../src/TypeInjection.cpp"
+
 using namespace CIProviderTestAccess;
 
 namespace ClassInjectorFieldLayoutTests {
@@ -165,7 +168,7 @@ namespace ClassInjectorFieldLayoutTests {
                          .params = parameters.data(),
                          .stringPool = names,
                          .bytePool = bytes.data()};
-        ci::g_database = ci::BuildTypeDatabase(original, {});
+        ci::g_database = ci::BuildTDB(original, {});
         auto& database = *ci::g_database;
         ci::CreateMethodTrampolines(database);
         ci::PrepareInvokeAdapters(database);
@@ -177,19 +180,20 @@ namespace ClassInjectorFieldLayoutTests {
         calls = 0;
         observedObject = nullptr;
         observedReady = false;
-        std::vector<ci::ClassProviderNotification> callbacks{{[](const ci::ProviderContext* context) noexcept {
+        auto& callbacks = ci::TypeInjection::g_providerCallbacks;
+        callbacks = {{[](const ci::ProviderContext* context) noexcept {
             ++calls;
-            observedReady = ci::g_ready.load();
+            observedReady = ci::TypeInjection::g_ready.load();
             observedObject = QueryType(context, "System.Object");
         }}};
         const bool passed = database.customTypes.empty() && database.customMethods.empty() &&
                             published.numTypes == original.numTypes && published.types == database.types.data() &&
-                            !ci::CompleteRuntimeInitialization(callbacks) && !calls && callbacks.size() == 1 &&
-                            ci::FinalizeRuntimeTypes() && !calls && !ci::g_ready &&
-                            ci::CompleteRuntimeInitialization(callbacks) && calls == 1 && observedReady &&
+                            !ci::TypeInjection::OnVmMethodsRegistered() && !calls && callbacks.size() == 1 &&
+                            ci::TypeInjection::OnVmTypeTablesBuilt() && !calls && !ci::TypeInjection::g_ready &&
+                            ci::TypeInjection::OnVmMethodsRegistered() && calls == 1 && observedReady &&
                             observedObject == &database.types[1] && callbacks.empty() &&
-                            ci::CompleteRuntimeInitialization(callbacks) && calls == 1;
-        ci::g_ready = false;
+                            ci::TypeInjection::OnVmMethodsRegistered() && calls == 1;
+        ci::TypeInjection::g_ready = false;
         ci::g_database.reset();
         return passed;
     }
@@ -274,10 +278,10 @@ int main() {
     publishedSDK.tdb = &testTDB;
     publishedSDK.type_definition = &testType;
     publishedSDK.method = &testMethod;
-    const auto wasReady = ci::g_ready.load();
+    const auto wasReady = ci::TypeInjection::g_ready.load();
     // 在独立 EXE 中调用真实准备流程；没有游戏 VM，未找到原生入口是预期场景。
     ci::PrepareContext();
-    if (&ci::GetContext() != publishedAddress || ci::g_ready.load() != wasReady || !context.sdk->tdb->find_type ||
+    if (&ci::GetContext() != publishedAddress || ci::TypeInjection::g_ready.load() != wasReady || !context.sdk->tdb->find_type ||
         !context.sdk->method->get_function || !context.sdk->type_definition->find_field ||
         !context.sdk->managed_object->get_type_definition || !context.sdk->field->get_data_raw ||
         !context.sdk->type_definition->is_derived_from || !context.sdk->type_definition->is_enum ||

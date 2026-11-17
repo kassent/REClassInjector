@@ -127,7 +127,7 @@ static void Run(const RE::TDB& header) {
     Add("RefValues", "System.Void", reinterpret_cast<void*>(&RefValues), {{"value", "System.Double", ci::ParameterModifier::Ref}, {"output", "System.Int32", ci::ParameterModifier::Out}, {"factor", "System.Single"}, {"id", "System.UInt32"}, {"peer", "System.Object"}, {"addend", "System.Double"}});
     Add("ColorArgument", "System.UInt32", reinterpret_cast<void*>(&ColorArgument), {{"color", "via.Color"}, {"factor", "System.Single"}, {"id", "System.UInt32"}, {"peer", "System.Object"}, {"number", "System.Double"}});
     auto previous = std::move(ci::g_database);
-    ci::g_database = ci::BuildTypeDatabase(header, {{.name = "Tests.InvokeSignatures", .methods = methods}});
+    ci::g_database = ci::BuildTDB(header, {{.name = "Tests.InvokeSignatures", .methods = methods}});
     auto& database = *ci::g_database;
     database.encodingBase = uintptr_t(GetModuleHandleW(nullptr));
     // 小签名可能已有原 recipe，离线强制同样经过生成器，确保零/一参数分支也被实际执行。
@@ -199,7 +199,7 @@ static void Run(const RE::TDB& header) {
         auto invalid = methods[0]; invalid.returnType = name;
         Check(ci::ClassifyInvokeSignature(database, invalid).result == ci::InvokeValueKind::Unsupported, "hidden-buffer return not generated");
         bool rejected{};
-        try { ci::BuildTypeDatabase(header, {{.name = "Tests.NoHiddenReturn", .methods = {invalid}}}); } catch (const std::exception&) { rejected = true; }
+        try { ci::BuildTDB(header, {{.name = "Tests.NoHiddenReturn", .methods = {invalid}}}); } catch (const std::exception&) { rejected = true; }
         Check(rejected, "missing recipe with hidden return is rejected");
     }
     Check(database.FindMethod(first + 5)->invokeAdapter == database.FindMethod(first + 6)->invokeAdapter, "UInt16 and Char share ABI code");

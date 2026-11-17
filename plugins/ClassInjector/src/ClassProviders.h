@@ -9,8 +9,9 @@ namespace ci {
         std::shared_ptr<const ProviderSource> providerSource;
         FnInitializationCallback postInitialize{};
     };
-    // Return accepted declarations; modules remain loaded while their native entries can be called.
-    std::vector<CustomTypeConfig> LoadClassProviders(const std::vector<std::filesystem::path>& directories,
-                                                     std::vector<ClassProviderNotification>* callbacks = nullptr);
+    // 覆盖两份输出，返回本次接受的类型配置和待通知项；已加载模块仍按原策略留驻。
+    void LoadClassProviders(const std::vector<std::filesystem::path>& directories,
+                            std::vector<CustomTypeConfig>& typeConfigs,
+                            std::vector<ClassProviderNotification>& callbacks);
     void NotifyClassProviders(std::vector<ClassProviderNotification>& callbacks, const ProviderContext& context);
 } // namespace ci
