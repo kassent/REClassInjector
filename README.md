@@ -3,17 +3,11 @@
 [English](README.md) | [简体中文](README.zh-CN.md) | [Provider SDK](include/ci/Provider.hpp)
 [Build from source / 从源码构建](BUILDING.md)
 
-**Integrate earlier in game initialization, and give your mod its own components, data, and native behavior.**
-
-ClassInjector (CI) is an **early plugin loader and runtime type-extension framework** for RE Engine mod developers. It provides two complementary capabilities: bringing plugin integration forward to the point where the engine's TDB and native method entries are ready, before subsequent critical initialization runs; and letting developers define their own managed classes, components, and UserData types that participate in the engine's native object creation, method calls, resource loading, and lifecycles.
-
-Developers describe types, fields, and methods in TOML and provide method implementations in C++. CI registers them during game startup and hands control to plugins through an early readiness callback. Mods can prepare their integration at the appropriate initialization stage and organize features around their own types, rather than always modifying results after initialization or fitting every new feature into existing logic through hooks.
-
-Supported environment: **Monster Hunter Wilds, Windows x64, TDB81**.
+ClassInjector (CI) provides startup callbacks and managed-type extensions for **Monster Hunter Wilds (Windows x64, TDB81)**. Declare types and members in TOML, implement methods in C++, and use those types through the game’s object, component, or resource APIs.
 
 ## Contents
 
-- [1. What Problems Does It Solve?](#1-what-problems-does-it-solve)
+- [1. Choose an Integration Path](#1-choose-an-integration-path)
 - [2. Capabilities and Responsibilities](#2-capabilities-and-responsibilities)
 - [3. Installation and File Layout](#3-installation-and-file-layout)
 - [4. Quick Start: A Counter Type](#4-quick-start-a-counter-type)
@@ -24,134 +18,14 @@ Supported environment: **Monster Hunter Wilds, Windows x64, TDB81**.
 - [9. Generics and Arrays](#9-generics-and-arrays)
 - [10. Initialization and the Provider SDK API](#10-initialization-and-the-provider-sdk-api)
 - [11. Compatibility, Troubleshooting, and Distribution](#11-compatibility-troubleshooting-and-distribution)
-- [12. Frequently Asked Questions](#12-frequently-asked-questions)
 
-## 1. What Problems Does It Solve?
+## 1. Choose an Integration Path
 
-### 1.1 Problem One: Conventional Plugin Integration Can Happen Too Late
+- **Run before static initialization:** pair a provider DLL with a same-name TOML and use `ci_on_initialize` to query TDB metadata and prepare your integration. An empty TOML is enough for a provider that declares no types. See [startup callbacks](#102-two-initialization-phases-and-zero-type-providers).
+- **Add a managed type:** declare fields, methods, and inheritance in TOML and register the C++ implementations in your provider. See the [counter example](#4-quick-start-a-counter-type).
+- **Add reusable behavior and data:** derive a component from `app.AppBehavior` and attach it through the GameObject component API. For resource-backed parameters, define a `via.UserData` type and author a matching USER. The engine drives the component’s lifecycle.
 
-For a plugin that uses the TDB to look up types, fields, and methods, having its DLL loaded is different from being ready to execute logic against the type system. A conventional REFramework plugin must wait until REFramework has successfully acquired and prepared the TDB before relying on its SDK for these operations.
-
-The game's initialization stages are not organized around a mod's needs. By the time an ordinary plugin can use the TDB, some game logic, static data, or initialization results may already exist. For example:
-
-- A type list may already have been read and used to build a cache.
-- A table may already have been constructed from its initial inputs, with later code reading only the cached result.
-- A system may already have completed its first initialization and decided which objects or entries to create for the process.
-
-A hook installed at that point may affect only **future calls**, not the first initialization that has already occurred. The author may then need to backfill data, rebuild caches, or find additional downstream integration points. The issue is not necessarily a limitation of hooking itself: the required initialization window has already passed.
-
-### 1.2 CI Is Also an Earlier Plugin Loader
-
-CI does more than add classes. It loads participating provider DLLs early and exposes `ci_on_initialize`, a callback for **integrating with subsequent initialization as soon as the type system is available**.
-
-This notification occurs **after TDB types and native method entries are ready, but before global static constructors execute**. A plugin can look up the types and methods it needs, prepare its integration, and install hooks that must take effect before initialization, then let the engine continue normally.
-
-The startup stages relevant to plugin integration are:
-
-```text
-Engine startup
-  |
-  +-- CI loads participating providers early and collects
-  |   function registrations and type declarations
-  |
-  +-- The engine builds the TDB and prepares types and native method entries
-  |    |
-  |    +-- CI: every provider's ci_on_initialize(context)
-  |    |    Query entries, prepare integration, submit TDB-dependent JSON to UDE
-  |    +-- CI: every provider's ci_on_post_initialize(context)
-  |         UDE closes registration, validates declarations, installs its decode hook
-  |
-  +-- Global static constructors and other initialization continue
-  |   Type lists, static tables, and caches are built by their systems
-  |
-  +-- Conventional REFramework plugins reach their SDK/TDB-dependent stage
-      Some first-time initialization results may already exist
-```
-
-**Example: a cache built once at startup.** Suppose a system builds a cache from a type list only once. Changing the list's source after the cache has been created does not automatically rebuild the cache. A CI plugin can integrate with that source in its early callback so that the system reads the extended input when constructing the cache for the first time. This changes how initialization happens, rather than patching its results afterward. The plugin implements the actual list and cache integration.
-
-This is also useful for plugins that **need earlier initialization access without adding any new types**. CI can be used solely as an early loader; see Section 10.
-
-CI advances **the loading and callback timing of plugins participating in its loading flow**. It does not initialize the REFramework SDK earlier. Use CI's ProviderContext during the early stage, and run SDK-dependent logic after the REFramework SDK becomes available.
-
-### 1.3 Problem Two: New Features Should Not Always Be Patches to Existing Logic
-
-Scripts and hooks can modify fields, intercept methods, and store extra state in Lua tables or C++ containers. That extra state does not automatically become an engine-recognized type. Native code cannot create it as a component simply by knowing a type name, and resource files do not automatically know how to instantiate it.
-
-ClassInjector provides another approach:
-
-```text
-TOML: declare types, fields, inheritance, and method signatures
-                              +
-C++ DLL: register the corresponding method implementations
-                              |
-                              v
-Register with the engine's type system during startup
-                              |
-                              v
-Native code / REFramework / resources use the declared type contracts
-```
-
-You can define your own configuration objects, behavior parameters, and components instead of borrowing an unrelated built-in type name, repurposing existing fields, or maintaining an external object-address-to-state map for every feature.
-
-### 1.4 A Native Authoring Experience Closer to Unity's Component Model
-
-Developers familiar with engines such as Unity often structure a feature around components for behavior, data objects for parameters, and scenes or prefabs for composition, with the engine driving their lifecycles. CI aims to bring a similar authoring approach to RE Engine mods: **define your own content and let the engine use it through native mechanisms, rather than only modifying existing code paths**.
-
-In RE Engine, this component-based, data-driven approach can be organized as follows:
-
-| Authoring task | Organization with CI | Engine responsibility |
-|---|---|---|
-| Define behavior | Create a component derived from `app.AppBehavior` | Attachment, enable/disable behavior, and the applicable update and destruction lifecycles |
-| Define parameters | Create a type derived from `via.UserData` | Read parameters from matching resources according to the type declaration |
-| Compose features | Place components and data references in matching PFB/object relationships | Instantiate and associate objects using the resource and component structure |
-| Manage runtime state | Store timers, state, and references in instance fields | Recognize object layouts and managed reference relationships |
-| Extend a calling contract | Implement an existing interface or override an extensible virtual method | Invoke the implementation through native dispatch |
-
-For example, a custom periodic behavior for a scene object could use:
-
-```text
-Example.PulseSettings : via.UserData
-  +-- IntervalSeconds   Period interval, loaded from a resource
-  +-- EnabledAtStart    Initial enabled state, loaded from a resource
-
-Example.PulseBehavior : app.AppBehavior
-  +-- Settings          Reference to its configuration object
-  +-- Elapsed           Per-instance elapsed time
-  +-- doStart           Read ready configuration and initialize state
-  +-- update            Advance this instance's behavior
-  +-- doOnDestroy       Clean up external resources or subscriptions it owns
-
-Matching PFB / standard component creation path
-  +-- Attach the component to a GameObject; the engine drives its lifecycle
-```
-
-Implement the component's behavior, provide the matching configuration resource, and attach it through the component creation path. Hold and release configuration references and external resources at the appropriate lifecycle stages.
-
-This differs from hooking an existing update function, iterating an external object table, and looking up state by object address. **Behavior belongs to your component, parameters belong to your data, runtime state belongs to your objects, and scheduling is delegated to the engine wherever possible.** Multiple objects can reuse the same component type while retaining independent instance state. Parameter changes can be expressed through resources rather than hard-coded branches.
-
-CI is therefore not just a way to add more modification points. Its purpose is to help mods express new features as content authored with the engine. Hooks remain useful for connecting systems without an exposed integration point or changing existing rules, but they do not have to be the foundation of every new feature.
-
-### 1.5 How the Two Capabilities Work Together
-
-The early loader addresses **when to integrate**; type extension addresses **what form that integration takes**. They can be used independently or together:
-
-- To influence first-time initialization, use the early callback without defining a new class.
-- To add an independent component or data object, define a type and use the matching native creation and lifecycle paths.
-- To include a new type in startup registration or initial cache construction, register the type and connect it to the relevant system in the early callback, before that system initializes.
-
-CI provides the timing and type capabilities. Extension authors connect new content to each system according to that system's contract.
-
-### 1.6 Benefits for Developers
-
-- **Earlier integration:** prepare logic before critical initialization and reduce the need to patch initialization results afterward.
-- **Explicit type identity:** custom objects have their own names, inheritance relationships, fields, and method declarations.
-- **State attached to objects:** additional state can live in object fields, with managed reference relationships recognized by the engine.
-- **Native extension points:** inheritance, virtual overrides, and existing interfaces connect implementations to matching native call paths.
-- **Data-driven design:** serializable fields on new types allow parameters to live in USER/PFB resources while behavior remains in code.
-- **Cross-plugin collaboration:** other extensions can access objects using agreed type names and signatures without depending on a provider's private C++ classes.
-
-These capabilities improve both integration timing and feature organization. Authors can use native mechanisms for object creation, reference ownership, and calls, leaving component scheduling to the engine.
+Use the CI SDK for startup callbacks. Features that use the REFramework SDK, including the Lua quick start, run after REFramework initializes.
 
 ## 2. Capabilities and Responsibilities
 
@@ -322,7 +196,7 @@ After fully restarting the game, look for `CounterExample: first=3, second=7, Va
 
 The script performs the counter operation once per script load. When finished, remove `CounterExample.lua` and restart the game to remove the example hook. In your own feature, use the counter from a component or another suitable native lifecycle.
 
-The creation path used by `sdk.create_instance` differs from `ProviderContext.CreateInstance`: the latter allocates only and does not implicitly invoke a constructor. See Section 5.3.
+The creation path used by `sdk.create_instance` differs from CI’s `api.objects().create_instance(...)`: the latter allocates only and does not implicitly invoke a constructor. See Section 5.3.
 
 ## 5. TOML Declaration Reference
 
@@ -469,7 +343,7 @@ fields = [
 ]
 ```
 
-`Limit` is read from the matching resource; `RuntimeCounter` is runtime-only. The declaration does not generate a resource file.
+`Limit` is read from the matching resource; `RuntimeCounter` is runtime-only. Author a matching resource file. To persist fields in a save, integrate with the game’s save system separately.
 
 When authoring USER/PFB files, RSZ type information uses the type-name hash and the corresponding engine TypeInfo CRC. Field data follows the serialization declaration. Runtime type IDs, name hashes, and TypeInfo CRCs are different identifiers and must be supplied according to the resource format. When field declarations change, update the resources and the schemas used by editing tools together.
 
@@ -517,7 +391,7 @@ appends = [{ name = "Example_ExtraDay", value = 7 }]
 
 - Each rename uses either `fromName` or `fromValue`. These select a source member and **preserve its numeric value**.
 - Appended members use `name` and an Int32 `value`. Duplicate names are errors; existing members are not overwritten.
-- An alias with the same value does not replace the original canonical name. Value-to-name lookup still returns the first matching member.
+- An alias with the same value does not replace the original canonical name. Value-to-name lookup returns the first matching member.
 - Within one declaration, renames are applied before appends. Fully restart after changes.
 - Dynamic registration is also available through `registration.register_enum(...)` inside `CI_REGISTER_PROVIDER`.
 
@@ -540,7 +414,7 @@ Generic instances are explicitly declared at startup. Arguments are limited to s
 
 When a field or method uses `Example.Counter[]`, CI automatically supplies the missing one-dimensional class-reference array type. A separate `[[types]]` array declaration is not needed. Existing array types are reused.
 
-New array types are limited to one-dimensional class-reference arrays. New value-type arrays, multidimensional arrays, jagged arrays, array covariance, and complete generic array interfaces are outside the supported scope. ProviderContext's `CreateArray` can allocate instances of value-array types already present in the engine.
+New array types are limited to one-dimensional class-reference arrays. New value-type arrays, multidimensional arrays, jagged arrays, array covariance, and complete generic array interfaces are outside the supported scope. `api.objects().create_array(...)` can allocate instances of value-array types already present in the engine.
 
 ## 10. Initialization and the Provider SDK API
 
@@ -573,7 +447,7 @@ CI_REGISTER_PROVIDER(registration) {
 
 Omit unused `renames` or `additions` instead of passing empty positional lists. `EnumChanges` is a local argument, not an initializer_list or STL object to retain across DLLs. Register functions as in Section 4: `registration.register_func("full binding key", &implementation, version)`.
 
-The current SDK ABI is **3**. `ProviderContext` contains only `const ci::SDKAPI* sdk`. SDK ABI, TOML `schema_version`, and each function's `binding.version` are independent versions. ABI1/2 are incompatible with this host; rebuild the host and every provider installed in that instance together. The public-header and snake_case reorganization preserves ABI3 layouts.
+Build providers with the **SDK ABI 3** headers that match the host. Access SDK services through `ProviderContext::sdk`. The ABI identifies the host interface; TOML `schema_version` identifies the declaration format; `binding.version` identifies a method binding.
 
 ### 10.2 Two Initialization Phases and Zero-Type Providers
 
@@ -640,14 +514,14 @@ static bool HasObjectConstructor(const ci::ProviderContext& context) {
 | Resources | `resource_manager` / `api.resources()` | `create_userdata` returns one owned reference, not necessarily decoded; holder finalizers own their native requests |
 
 - `Field::get_data<T>()` returns **`T&`**; `ManagedObject::get_field<T>()` returns **`T*`**. The caller checks the actual field type.
-- Address instance fields through the actual object; use `get_data_raw(payload, true)` for unboxed embedded payloads. Field views copy by value, but addresses remain tied to object lifetime. There is no public `FieldLayout` or UDE global field-layout cache.
+- Address instance fields through the actual object; use `get_data_raw(payload, true)` for unboxed embedded payloads. Field views copy by value, but addresses remain tied to object lifetime.
 - `get_init_data()` returns borrowed metadata initializer bytes, or `nullptr` when absent. It is not runtime static storage or present on every field. For enum constants, check literal status, type, and width before reading; zero is not an absent initializer.
 - Raw `get_fields/get_methods` `out_size` is in **bytes**; `out_count` counts written handles. `ci::Result` follows REF's integer convention (`ERROR_NONE == 0`). C++ wrappers allocate DLL-local vectors; no custom visitor is needed.
 - `create_action(vmContext, actionType, target, method)` takes a real Method handle, not a C++ function address or a manually replaced delegate slot.
 - No API establishes a managed VM scope. Create objects and execute methods within real native lifecycles; a main thread, VM context, bare IPC, or `UpdateBehavior` is not proof of an outer scope. Initialize reference-array elements before first publication to an owner.
 - Unresolved optional entries may be null; check services actually required. Successful queries do not imply business, resource, or RF SDK readiness.
 
-Method lookup still uses complete signatures, comma spacing, parent lookup, and ref/out element-type rules; it does not perform automatic virtual dispatch or construction. See the [provider header](include/ci/Provider.hpp), [SDK views](include/ci/API.hpp), [ABI tables](include/ci/API.h), and [UDE submission example](https://github.com/kassent/UserDataExtension/blob/main/README.md#10-plugin-developer-api).
+Method lookup uses complete signatures, comma spacing, parent lookup, and ref/out element-type rules; it does not perform automatic virtual dispatch or construction. See the [provider header](include/ci/Provider.hpp), [SDK views](include/ci/API.hpp), [ABI tables](include/ci/API.h), and [UDE submission example](https://github.com/kassent/UserDataExtension/blob/main/README.md#10-plugin-developer-api).
 
 ## 11. Compatibility, Troubleshooting, and Distribution
 
@@ -676,7 +550,7 @@ Common log messages:
 | `function missing` / `function version mismatch` | TOML bindings disagree with DLL registrations |
 | `Plugin skipped` | The provider was skipped; types depending on it may also be affected |
 | `SDK ABI identity missing` / `SDK ABI mismatch` | Missing version export or mismatched ABI; check the host and every provider in this instance |
-| `Startup window missed` | The runtime missed the startup registration window; check the installed version and loading arrangement |
+| `Runtime entries FAILED` | Types or native entries are not ready; check earlier metadata and type-registration logs |
 | `Published metadata` / `Registered` | Type publication/registration has progressed; also confirm entry readiness |
 | `CI provider initialization complete; injection ready=1` | CI completed registration and readiness notification; continue with feature-specific or resource-loading diagnostics |
 
@@ -695,45 +569,3 @@ Include:
 Before release, check: **launch the game → register types → create objects and call them through the intended game-system path → check fields and results → destroy objects, change scenes, and exit normally**. Check component behavior, asynchronous resource loading, and multiplayer features separately when applicable. Include only files required at runtime in the release package.
 
 The runtime is a shared dependency. When uninstalling one extension, remove only that extension's files and retain the runtime if other extensions still depend on it. Exit the game before uninstalling or updating.
-
-## 12. Frequently Asked Questions
-
-### How Does CI Relate to REFramework?
-
-CI provides early plugin loading and type extension. REFramework provides scripting, reflection access, and plugin capabilities. Some initialization may already be complete when ordinary RF plugins reach their SDK/TDB-dependent stage. CI's early initialization callback lets plugins prepare integration before subsequent critical initialization. It does not require new types and does not initialize the RF SDK earlier. Lua examples and SDK-based field access still require the appropriate REFramework environment.
-
-### Can I Use CI Without Adding a Class?
-
-Yes. Supply a matching TOML file, the fixed registration entry point, and `ci_on_initialize` to use CI as an early loader; see Section 10.2. Use ProviderContext for early lookups and integration setup.
-
-### What Does an Authoring Experience Closer to Unity Mean?
-
-It means organizing a mod around your own components, your own data, and native lifecycles. For example, implement behavior in a custom AppBehavior, store configurable parameters in a custom UserData type, and create and compose them through standard component or PFB paths. This is an authoring approach, not a port of Unity's APIs, editor, or C# environment. The goal is to build new features on RE Engine's native mechanisms rather than relying entirely on external patches around existing functions.
-
-### Does CI Replace Every Hook?
-
-Hooks and native extensions serve different purposes. For new independent behavior, prefer your own components, data, and native call paths instead of attaching all logic to an existing update function. Hooks remain useful for changing built-in rules or connecting systems without an exposed entry point. CI's early loader also lets those hooks take effect before critical initialization. The goal is to use hooks as integration tools where needed, rather than as the only way to implement every feature.
-
-### Is Editing TOML Enough to Add New Behavior?
-
-TOML describes contracts, not method bodies. Declarations can bind to existing C++ implementations, but new method logic needs a provider implementation. Lua can consume registered types; it is not the implementation backend for method bindings.
-
-### Why Does a Type Exist but Produce No Visible Effect?
-
-Check whether the object is created through the correct path, its constructor executes, it is connected to the intended game-system registry, resources reference the correct type, and the lifecycle actually invokes its methods. Registration is the first step.
-
-### Are New Fields Saved Automatically?
-
-Runtime fields do not automatically become part of save data. `serialize = true` on a new type controls field reading from matching resources; it does not connect the type to the game's save-writing system. Fields appended to built-in classes are runtime-only.
-
-### Can I Update Types or Unload a DLL While the Game Is Running?
-
-Types and providers remain valid for the entire game process. Fully restart after updates, removal, or layout changes; do not unload implementations while existing objects remain alive.
-
-### Can CI Load a C# DLL Directly?
-
-The integration model is TOML declarations plus a C++ provider. It does not include a general C# assembly loader or JIT.
-
----
-
-**Integration essentials: enter at the right initialization stage, define your types in TOML, implement behavior in C++, organize features with native components, resources, and lifecycles, and check results through actual consumers.**

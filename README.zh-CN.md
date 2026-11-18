@@ -3,17 +3,11 @@
 [English](README.md) | [简体中文](README.zh-CN.md) | [Provider SDK](include/ci/Provider.hpp)
 [Build from source / 从源码构建](BUILDING.md)
 
-**更早接入游戏初始化，让 Mod 拥有自己的组件、数据和原生行为。**
-
-ClassInjector（下文简称 CI）是面向 RE Engine Mod 开发者的**早期插件 loader 与运行时类型扩展基础设施**。它提供两项互相配合的能力：一是将插件的接入时机提前到引擎 TDB 和原生方法入口就绪后、后续关键初始化尚未执行的阶段；二是允许开发者定义自己的托管 class、组件和 UserData，让它们参与引擎原生的创建、调用、资源加载和生命周期。
-
-开发者通过 TOML 描述类型、字段和方法，通过 C++ 提供方法实现。CI 在游戏启动过程中完成注册，并通过早期就绪回调把控制权交给插件。这样，Mod 不必总是等游戏完成初始化后再修改结果，也不必总是依靠 hook 将新需求塞进已有逻辑；可以在适当的初始化阶段接入，并围绕自己的类型组织功能。
-
-适用环境：**Monster Hunter Wilds、Windows x64、TDB81**。
+ClassInjector（CI）为 **《怪物猎人：荒野》（Windows x64／TDB81）**的 Mod 提供启动期回调和托管类型扩展。使用 TOML 声明类型和成员，用 C++ 实现方法，再通过游戏的对象、组件或资源入口使用这些类型。
 
 ## 目录
 
-- [1. 它解决什么问题](#1-它解决什么问题)
+- [1. 选择接入方式](#1-选择接入方式)
 - [2. 能力与职责边界](#2-能力与职责边界)
 - [3. 安装与文件组织](#3-安装与文件组织)
 - [4. 快速上手：一个计数器类型](#4-快速上手一个计数器类型)
@@ -24,131 +18,14 @@ ClassInjector（下文简称 CI）是面向 RE Engine Mod 开发者的**早期�
 - [9. 泛型与数组](#9-泛型与数组)
 - [10. 初始化与 Provider SDK API](#10-初始化与-provider-sdk-api)
 - [11. 兼容性、诊断与交付](#11-兼容性诊断与交付)
-- [12. 常见问题](#12-常见问题)
 
-## 1. 它解决什么问题
+## 1. 选择接入方式
 
-### 1.1 第一个问题：普通插件的业务接入时机偏晚
+- **在静态初始化前接入**：将 provider DLL 与同名 TOML 配对，在 `ci_on_initialize` 中查询 TDB 元数据并准备接入。只使用启动回调时，可提供空 TOML。见[启动回调](#102-两阶段初始化与零类型-provider)。
+- **新增托管类型**：在 TOML 中声明字段、方法和继承关系，在 provider 中登记 C++ 实现。见[计数器示例](#4-快速上手一个计数器类型)。
+- **添加可复用的行为和数据**：从 `app.AppBehavior` 派生组件，通过 GameObject 的组件接口挂载。参数需要从资源读取时，定义 `via.UserData` 派生类型并制作匹配的 USER。组件生命周期由引擎驱动。
 
-对于需要依赖 TDB 查询类型、字段和方法的插件，“DLL 已被加载”和“已经能基于类型系统执行业务”是两件事。常规 REFramework 插件需要等待 REFramework 成功取得并准备好 TDB，才能依赖其 SDK 完成这些操作。
-
-但游戏不会以 Mod 的初始化需求为界划分所有工作。在普通插件能够使用 TDB 开始接入时，一些游戏逻辑、静态数据或初始化结果可能已经生成。例如：
-
-- 某个类型列表已经被读取，并据此创建了后续使用的缓存。
-- 一张业务表已经根据初始条件完成构造，之后只读缓存，不再查询原始来源。
-- 一个系统已经完成首次初始化，决定了本次进程要创建哪些对象、注册哪些条目。
-
-此时才安装 hook，可能只能影响**之后的调用**，无法改变已经发生的首次初始化。作者往往还需要回填旧数据、重建缓存，或寻找更多下游入口补救。问题不一定是 hook 能力不足，而是接入点已经错过。
-
-### 1.2 CI 也是一个更早介入的插件 loader
-
-CI 不只是“添加 class 的工具”。它还负责提前加载参与 CI 流程的 provider，并提供一个**在类型系统可用后立即接入后续初始化**的通知入口：`ci_on_initialize`。
-
-该通知发生于 **TDB 类型及原生方法入口就绪之后、全局静态构造执行之前**。插件因此可以先查询所需类型和方法、准备自己的入口、安装需要赶在初始化之前生效的 hook，再让引擎继续正常初始化。
-
-与插件接入相关的启动阶段如下：
-
-```text
-引擎启动
-  │
-  ├─ CI 提前加载参与其流程的 provider，收集函数登记和类型声明
-  │
-  ├─ 引擎建立 TDB，完成类型与原生方法入口准备
-  │    │
-  │    ├─ CI：全部 provider 的 ci_on_initialize(context)
-  │    │    查询入口、准备接入；向 UDE 提交依赖 TDB 的声明
-  │    └─ CI：全部 provider 的 ci_on_post_initialize(context)
-  │         UDE 关闭登记、校验声明并安装解码 hook
-  │
-  ├─ 继续全局静态构造等初始化
-  │    类型列表、静态表和缓存等在各自的初始化流程中建立
-  │
-  └─ 常规 REFramework 插件进入可依赖其 SDK/TDB 的业务阶段
-       此时再接入，部分首次初始化结果可能已经存在
-```
-
-**示例：首次生成的类型缓存。** 假设一个系统只在启动时根据类型列表建立一次缓存。普通插件在缓存生成后改变列表来源，旧缓存不会因此自动重建；CI 插件可以在早期回调中接入列表来源，让该系统首次构造缓存时就读取扩展后的输入。这样改变的是“初始化如何发生”，而不只是“初始化结束后如何修补”。列表与缓存的具体扩展由插件实现。
-
-这项能力对**只需要提前介入初始化、不需要新增类型**的插件也有价值。CI 可以单独作为早期 loader 使用，具体接入方式见第 10 节。
-
-需要区分的是：CI 提前的是**参与 CI 流程的插件加载和回调时机**，并不是让 REFramework SDK 自身提前初始化。早期阶段使用 CI 提供的 ProviderContext；需要 REFramework SDK 的逻辑，仍放在该 SDK 真正可用之后。
-
-### 1.3 第二个问题：新增功能不应永远只是对原版逻辑打补丁
-
-一般的脚本或 hook 可以修改字段、拦截方法，也可以在脚本表或 C++ 容器中保存额外状态。但这些额外数据并不因此成为引擎认识的类型：原生代码无法仅凭一个类型名称将其当作组件创建，资源文件也不会自动知道如何实例化它。
-
-ClassInjector 提供另一种扩展方式：
-
-```text
-TOML：声明类型、字段、继承关系和方法签名
-                     +
-C++ DLL：登记对应的方法实现
-                     ↓
-游戏启动时注册到引擎类型系统
-                     ↓
-原生代码 / REFramework / 配套资源按类型契约使用
-```
-
-例如，你可以定义自己的配置对象、行为参数或组件，而不是借用一个原版类型的名称、复用无关字段，或始终在外部维护“对象地址 → 额外状态”的映射。
-
-### 1.4 接近 Unity 组件化开发的原生游戏创作体验
-
-熟悉 Unity 等引擎的开发者，通常会把一个功能拆成“组件负责行为、数据对象负责参数、场景或 Prefab 负责组合”，再由引擎驱动它们的生命周期。CI 希望为 RE Engine Mod 创作者提供接近这种方式的开发体验：**不只是修改游戏已有的代码路径，而是定义自己的内容，让引擎以原生机制使用它。**
-
-对应到 RE Engine，这种组件化、数据驱动的创作方式可以这样组织：
-
-| 创作职责 | 使用 CI 后的组织方式 | 引擎负责的部分 |
-|---|---|---|
-| 定义行为 | 创建自己的 `app.AppBehavior` 派生组件 | 挂载、启停，以及匹配的更新和销毁生命周期 |
-| 定义参数 | 创建自己的 `via.UserData` 派生类型 | 按类型声明读取配套资源中的参数 |
-| 组合功能 | 将组件与数据引用放入匹配的 PFB/对象关系中 | 按正确资源与组件结构实例化和关联对象 |
-| 管理运行态 | 将计时、状态和对象引用放在自己的实例字段中 | 识别对象布局与托管引用关系 |
-| 扩展调用契约 | 实现已有接口或覆盖允许扩展的虚方法 | 沿原生分派路径调用相应实现 |
-
-例如，为场景物件添加一种自定义周期行为时，可以定义：
-
-```text
-Example.PulseSettings : via.UserData
-  ├─ IntervalSeconds   周期间隔，来自资源
-  └─ EnabledAtStart    初始开关，来自资源
-
-Example.PulseBehavior : app.AppBehavior
-  ├─ Settings          对配置对象的引用
-  ├─ Elapsed           当前实例的运行时计时
-  ├─ doStart           读取已就绪配置，建立初始状态
-  ├─ update            推进该实例自己的行为
-  └─ doOnDestroy       清理该行为自行申请的外部资源或订阅
-
-配套 PFB / 正规组件创建路径
-  └─ 将组件挂到实际 GameObject，由引擎驱动生命周期
-```
-
-实现这组类型时，为组件提供行为代码，为配置提供匹配的资源，并通过组件创建路径完成挂载；配置引用与外部资源在相应生命周期中持有和释放。
-
-这种方式与“hook 某个原版更新函数，遍历外部对象表，再按对象地址查状态”有明显不同：**功能属于自己的组件，参数属于自己的数据，运行态属于自己的对象，调度尽量归引擎。** 同一组件可以被多个对象复用，每个实例拥有独立状态；参数变化可以通过数据资源表达，不必都变成硬编码分支。
-
-因此，CI 的目标不是简单增加更多修改点，而是让 Mod 逐步具备“用引擎创作新功能”的表达能力。hook 仍可用于连接尚未开放的业务入口或修改既有规则，但不必成为每一项新增功能的主体。
-
-### 1.5 两项能力如何配合
-
-早期 loader 解决“**何时接入**”，类型扩展解决“**以什么形式接入**”。两者可以独立使用，也可以组合：
-
-- 只需要影响首次初始化：使用早期回调，不必为此定义新 class。
-- 只需要独立组件或数据对象：定义类型，通过匹配的原生创建和生命周期使用。
-- 需要让新类型参加启动注册或首次缓存构造：先注册类型，再在早期回调中接入相应业务入口，让后续初始化看到新增内容。
-
-CI 提供时机与类型能力；具体业务系统如何接收新增内容，由扩展作者按该系统的契约接通。
-
-### 1.6 对开发者的意义
-
-- **更早的业务接入点**：在关键初始化之前准备逻辑，减少事后修补初始化结果的需要。
-- **清晰的类型身份**：自定义对象拥有独立名称、父类关系、字段和方法声明。
-- **对象与状态结合**：额外状态可以成为对象字段，其托管引用关系由引擎识别。
-- **复用原生扩展点**：通过继承、虚方法覆盖和已有接口，将实现接入匹配的原生调用路径。
-- **支持数据驱动设计**：新类型可声明资源序列化字段，让参数保存在 USER/PFB 等配套资源中，行为留在代码里。
-- **便于跨插件协作**：其他扩展可以通过约定的类型名称和签名访问对象，不必依赖实现 DLL 的私有 C++ 类。
-
-这些能力同时改善接入时机和功能组织方式。扩展作者可以优先沿原生机制设计对象创建、引用持有和业务调用，将组件调度交给引擎。
+启动回调使用 CI SDK。依赖 REFramework SDK 的功能（包括快速上手中的 Lua 示例）在 REFramework 完成初始化后运行。
 
 ## 2. 能力与职责边界
 
@@ -319,7 +196,7 @@ end, nil)
 
 该脚本每次加载只执行一次计数器操作。完成示例后移除 `CounterExample.lua` 并重启游戏，即可移除示例 hook。正式功能应在自己的组件或其他合适的原生生命周期中使用计数器。
 
-`sdk.create_instance` 使用的创建路径与 `ProviderContext.CreateInstance` 的契约不同：后者只分配，不隐式调用构造，详见第 5.3 节。
+`sdk.create_instance` 使用的创建路径与 CI 的 `api.objects().create_instance(...)` 的契约不同：后者只分配，不隐式调用构造，详见第 5.3 节。
 
 ## 5. TOML 声明参考
 
@@ -466,7 +343,7 @@ fields = [
 ]
 ```
 
-`Limit` 从配套资源读取，`RuntimeCounter` 仅用于运行时。声明本身不会生成资源文件。
+`Limit` 从配套资源读取，`RuntimeCounter` 仅用于运行时。请制作匹配的资源文件。若需写入存档，还需接入游戏的存档流程。
 
 制作 USER/PFB 时，RSZ 类型信息使用类型名称 hash 和对应的引擎 TypeInfo CRC，字段数据按序列化声明编码。运行时 type ID、名称 hash 和 TypeInfo CRC 是不同标识，应分别按资源格式填写。字段声明变更后，同步更新资源及编辑工具使用的 schema。
 
@@ -537,7 +414,7 @@ appends = [{ name = "Example_ExtraDay", value = 7 }]
 
 声明字段或方法类型为 `Example.Counter[]` 时，缺失的单维 class 引用数组类型会自动补齐，无需另写一个 `[[types]]` 数组声明。已有数组类型直接复用。
 
-新增数组类型限单维 class 引用数组；新值类型数组、多维数组、jagged 数组、数组协变及完整泛型数组接口不在支持范围内。对于引擎已有的值数组类型，可通过 ProviderContext 的 `CreateArray` 分配实例。
+新增数组类型限单维 class 引用数组；新值类型数组、多维数组、jagged 数组、数组协变及完整泛型数组接口不在支持范围内。对于引擎已有的值数组类型，可通过 `api.objects().create_array(...)` 分配实例。
 
 ## 10. 初始化与 Provider SDK API
 
@@ -570,7 +447,7 @@ CI_REGISTER_PROVIDER(registration) {
 
 未使用的 `renames` 或 `additions` 可以省略，不传空列表占位。`EnumChanges` 是调用侧参数，不将 initializer_list 或 STL 对象跨 DLL 保存。函数登记仍使用第 4 节的 `registration.register_func("完整绑定键", &实现函数, version)`。
 
-当前 SDK ABI 为 **3**，`ProviderContext` 只含 `const ci::SDKAPI* sdk`。ABI、TOML 的 `schema_version`、单个函数的 `binding.version` 是三个不同版本。ABI1/2 与当前宿主不兼容，须协调重编宿主及该实例所有 provider；本次公共头和 snake_case 命名重组保持 ABI3 布局不变。
+使用配套的宿主和 **SDK ABI 3** 公共头来构建 provider。通过 `ProviderContext::sdk` 访问 SDK。ABI、TOML 的 `schema_version` 和方法的 `binding.version` 分别用于宿主接口、声明格式和方法绑定。
 
 ### 10.2 两阶段初始化与零类型 provider
 
@@ -637,14 +514,14 @@ static bool HasObjectConstructor(const ci::ProviderContext& context) {
 | 资源 | `resource_manager` / `api.resources()` | `create_userdata` 返回一份 owned 引用，但不承诺已解码；holder 的原生请求由其 finalizer 管理 |
 
 - `Field::get_data<T>()` 返回 **`T&`**；`ManagedObject::get_field<T>()` 返回 **`T*`**。模板参数由调用方核对，二者不要混用。
-- 实例字段按实际对象寻址；unboxed 的内嵌 payload 使用 `get_data_raw(payload, true)`。字段视图按值保存，字段地址只在对应对象有效期间使用；没有公共 `FieldLayout` 或 UDE 全局字段布局缓存。
+- 实例字段按实际对象寻址；unboxed 的内嵌 payload 使用 `get_data_raw(payload, true)`。字段视图按值保存，字段地址只在对应对象有效期间使用。
 - `get_init_data()` 返回元数据 initializer 的借用字节地址，缺失为 `nullptr`；它不是运行时 static storage，也不保证每个字段都有数据。枚举常量先核 literal、类型与宽度再读；数值 0 不是“无 initializer”。
 - 底层 `get_fields/get_methods` 的 `out_size` 是**字节数**，`out_count` 是写入条目数；`ci::Result` 沿用 REF 整数约定（`ERROR_NONE == 0`）。C++ 包装在本 DLL 内管理 vector，不需自建 visitor。
 - `create_action(vmContext, actionType, target, method)` 接受真实 Method 句柄，不传 C++ 函数地址代替或改写委托函数槽。
 - API 不建立 VM 托管作用域。对象创建、方法执行沿真实原生生命周期使用；主线程、取得 VM context、裸 IPC 或 `UpdateBehavior` 本身都不是外层作用域证明。引用数组先初始化元素，再首次发布给持有者。
 - 可选入口未解析时可能为 `nullptr`，按实际所需服务检查。查询成功不代表业务对象、资源或 RF SDK 可用。
 
-方法查找仍遵循完整签名、逗号空格、父链和 ref/out 元素类型规则，不自动虚分派或执行构造。实现入口见 [Provider 公共头](include/ci/Provider.hpp)、[SDK 视图](include/ci/API.hpp)；完整 ABI 见 [SDK 函数表](include/ci/API.h)，提交示例见 [UDE 指南第 10 节](https://github.com/kassent/UserDataExtension/blob/main/README.zh-CN.md#10-插件开发者接口)。
+方法查找遵循完整签名、逗号空格、父链和 ref/out 元素类型规则，不自动虚分派或执行构造。实现入口见 [Provider 公共头](include/ci/Provider.hpp)、[SDK 视图](include/ci/API.hpp)；完整 ABI 见 [SDK 函数表](include/ci/API.h)，提交示例见 [UDE 指南第 10 节](https://github.com/kassent/UserDataExtension/blob/main/README.zh-CN.md#10-插件开发者接口)。
 
 ## 11. 兼容性、诊断与交付
 
@@ -673,7 +550,7 @@ static bool HasObjectConstructor(const ci::ProviderContext& context) {
 | `function missing` / `function version mismatch` | TOML 的 binding 与 DLL 登记不一致 |
 | `Plugin skipped` | 该 provider 被跳过，依赖它的新类型也可能受影响 |
 | `SDK ABI identity missing` / `SDK ABI mismatch` | DLL 缺少版本导出或 ABI 不匹配；核宿主与该实例全部 provider 的配套版本 |
-| `Startup window missed` | 当前运行时未赶上启动注册窗口，检查安装版本及加载方式 |
+| `Runtime entries FAILED` | 类型或原生入口未就绪；查看前面的元数据发布和类型注册日志 |
 | `Published metadata` / `Registered` | 已推进到类型发布/注册阶段，仍需确认入口就绪 |
 | `CI provider initialization complete; injection ready=1` | CI 已完成注册及就绪通知，可继续排查具体业务或资源加载 |
 
@@ -692,45 +569,3 @@ static bool HasObjectConstructor(const ci::ProviderContext& context) {
 发布前检查：**启动游戏 → 类型注册 → 创建对象并通过业务入口调用 → 检查字段和结果 → 销毁、切场景及正常退出**。涉及组件、资源异步加载或多人行为时，分别检查相应功能。发行包仅包含运行所需文件。
 
 运行时是多个扩展共享的依赖。卸载单个扩展时只移除它自己的文件；保留其他扩展仍依赖的共享运行时。卸载及更新均在退出游戏后进行。
-
-## 12. 常见问题
-
-### 它和 REFramework 是什么关系？
-
-CI 同时提供早期插件 loader 和类型扩展；REFramework 提供脚本、反射访问及插件能力。普通 RF 插件进入依赖 SDK/TDB 的业务阶段时，部分初始化可能已经结束；CI 提供更早的 CI 初始化 接入点，让插件赶在后续关键初始化之前准备逻辑。它不要求先使用新类型，也不提前初始化 RF SDK。使用 Lua 验证或 SDK 字段接口时，仍需要相应 REFramework 环境。
-
-### 不新增 class，也能使用 CI 吗？
-
-可以。提供同名 TOML、固定登记入口和 `ci_on_initialize`，即可将 CI 用作早期 loader，具体见第 10.2 节。早期查询与接入准备使用 ProviderContext。
-
-### “接近 Unity 的创作体验”具体指什么？
-
-指按“自己的组件 + 自己的数据 + 原生生命周期”组织 Mod。例如用自定义 AppBehavior 实现行为，用自定义 UserData 保存可配置参数，再由正规组件或 PFB 路径创建和组合它们。它不是 Unity API、编辑器或 C# 环境的移植；目标是让开发者充分依托 RE Engine 的原生机制创作新增功能，而不是始终围绕已有函数做外部修补。
-
-### 它能替代所有 hook 吗？
-
-hook 与原生扩展各有用途。新增独立行为时，可以优先使用自己的组件、数据和原生调用路径，避免把全部逻辑挂在原版更新函数上；需要调整原版规则或连接缺少开放入口的系统时，仍可使用适量 hook。CI 的早期 loader 也能让这类 hook 在关键初始化之前生效。目标是让 hook 成为必要的连接手段，而不是所有新增功能唯一的实现方式。
-
-### 只改 TOML 就能实现新行为吗？
-
-TOML 描述契约，不包含方法体。已有 C++ 实现可以被声明引用；新的方法逻辑仍需要 provider 提供。Lua 可以消费已注册类型，但不是当前方法 binding 的实现后端。
-
-### 类型已查到，为什么还不出效果？
-
-依次确认：对象是否通过正确路径创建、构造是否执行、是否进入真实业务注册表、资源是否引用正确类型、生命周期是否真的调用到目标方法。注册成功只是第一步。
-
-### 新增字段会自动保存吗？
-
-运行时字段不会自动进入存档。新类型的 `serialize = true` 用于配套资源的字段读取，也不等同于接通游戏存档写入。原版 class 的追加字段只用于运行时。
-
-### 可以运行中更新类型或卸载 DLL 吗？
-
-类型和 provider 的有效期是整个游戏进程。更新、移除或修改布局后完整重启游戏，不在现有对象仍存活时卸载实现。
-
-### 能直接加载 C# DLL 吗？
-
-当前接入方式是 TOML 类型声明加 C++ provider，不包含通用 C# 程序集加载器或 JIT。
-
----
-
-**接入要点：在合适的初始化时机进入，用 TOML 定义自己的类型，用 C++ 实现行为，用原生组件、数据资源和生命周期组织功能，用真实消费者验证结果。**
